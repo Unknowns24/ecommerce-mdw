@@ -1,5 +1,5 @@
-// Package http exposes the HTTP composition boundary.
-package http
+// Package router exposes the HTTP composition boundary.
+package router
 
 import "github.com/go-chi/chi/v5"
 

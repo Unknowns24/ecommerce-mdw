@@ -34,7 +34,7 @@ El visitante y el comprador invitado son actores, no roles que requieran una cue
 
 **RBAC:** una cuenta administrativa puede tener uno o varios roles. Los permisos efectivos son la unión sin duplicados de sus permisos. El catálogo de permisos corresponde a acciones implementadas; crear un rol no crea nuevas funcionalidades. Solo el dueño administra cuentas administrativas y sus asignaciones de roles. Las demás tareas pueden delegarse mediante permisos específicos.
 
-**Bootstrap:** el registro del dueño inicial solo está disponible cuando no hay ningún usuario con rol dueño y exige una clave bootstrap/master definida en variables de entorno del servidor. El rol dueño es inborrable. El dueño inicial puede cambiar sus propios datos y contraseña, pero no eliminarse, desactivarse ni quitarse ese rol. La protección se valida también en el backend.
+**Bootstrap:** el registro del dueño inicial solo está disponible cuando no hay ningún usuario con rol dueño y exige una clave bootstrap/master definida en variables de entorno del servidor. El rol dueño es imborrable. El dueño inicial puede cambiar sus propios datos y contraseña, pero no eliminarse, desactivarse ni quitarse ese rol. La protección se valida también en el backend.
 
 **Propuesta para revisión:** impedir además modificaciones a los permisos del rol dueño; serializar el bootstrap para que solicitudes simultáneas no creen dos dueños iniciales. Los cambios de roles y bloqueos deben afectar también a sesiones ya abiertas, sin permitir continuar operando con permisos revocados.
 
@@ -435,7 +435,7 @@ Todos los indicadores admiten un período. Se consideran exclusivamente pedidos 
 | Cantidad promedio de productos  | Unidades vendidas / cantidad de pedidos considerados; cuenta unidades, no referencias distintas.                                         |
 | Evolución de ventas             | Total vendido agrupado por día, semana o mes, en gráfico de barras o línea.                                                              |
 | Diez productos más vendidos     | Orden descendente por unidades; se suman todas las variantes de cada producto.                                                           |
-| Diez usuarios que más compraron | Clientes registrados ordenados por importe de productos comprado después de descuentos y sin envío. Invitados excluidos de este ranking. |
+| Diez usuarios que más compraron | Clientes registrados ordenados por importe de productos comprados después de descuentos y sin envío. Invitados excluidos de este ranking. |
 
 El nombre del indicador es «Total vendido», no «Total facturado», porque su base son pedidos pagados, no documentos fiscales. No se agrupan invitados como usuarios por coincidencia de correo o DNI. Cancelar una venta la excluye de estos indicadores, incluso al consultar su período original; no se presenta este panel como un libro contable de reintegros.
 
@@ -536,9 +536,9 @@ Referencias técnicas de mapas consultadas para distinguir servicios: [API de No
 
 | RFC                          | Propuesta futura                                          | Aspectos por analizar                                                                                                |
 | ---------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| RFC-01 — Carrito abandonado  | Contactar a clientes registrados para recordar su carrito | Consentimiento/preferencias, canal, plazo, frecuencia y condiciones de no envío. No activado en v1.                  |
-| RFC-02 — Transporte nacional | Cotizar y operar con un transportista de larga distancia  | Comparar cobertura, tarifas, acceso a API y operación de Andreani, Correo Argentino u OCA. Ningún proveedor elegido. |
-| RFC-03 — Reintegro integrado | Ejecutar y verificar devoluciones mediante Mercado Pago   | Permisos, idempotencia, estados pendientes/fallidos, restitución de stock y documentos fiscales.                     |
+| RFC-001 — Carrito abandonado  | Contactar a clientes registrados para recordar su carrito | Consentimiento/preferencias, canal, plazo, frecuencia y condiciones de no envío. No activado en v1.                  |
+| RFC-002 — Transporte nacional | Cotizar y operar con un transportista de larga distancia  | Comparar cobertura, tarifas, acceso a API y operación de Andreani, Correo Argentino u OCA. Ningún proveedor elegido. |
+| RFC-003 — Reintegro integrado | Ejecutar y verificar devoluciones mediante Mercado Pago   | Permisos, idempotencia, estados pendientes/fallidos, restitución de stock y documentos fiscales.                     |
 
 ### Puntos a resolver durante la revisión, sin ampliar el alcance
 

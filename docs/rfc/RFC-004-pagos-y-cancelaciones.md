@@ -12,4 +12,4 @@
 
 ## Límite vigente
 
-Se mantienen las garantías de `specs.md`: no se confirma desde el navegador, no se completa con stock negativo, no se duplica un cobro/movimiento/uso de cupón y no se declara un reintegro automático. La aprobación tardía se registra como incidencia para resolución controlada.
+Se mantienen las garantías de `specs.md`: no se confirma desde el navegador, no se completa con stock negativo, no se duplica un cobro/movimiento/uso de cupón y no se declara un reintegro automático. La aprobación tardía queda propuesta para registrarse como incidencia de resolución controlada.

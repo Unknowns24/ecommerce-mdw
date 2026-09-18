@@ -8,6 +8,7 @@ package config
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,12 +71,25 @@ func parsePositiveDuration(name, raw string) (time.Duration, error) {
 	return value, nil
 }
 
+func parsePort(name, raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	port, err := strconv.Atoi(value)
+	if err != nil || port < 1 || port > 65535 {
+		if err != nil {
+			return "", fmt.Errorf("%s must be a valid TCP port between 1 and 65535: %w", name, err)
+		}
+		return "", fmt.Errorf("%s must be a valid TCP port between 1 and 65535", name)
+	}
+	return value, nil
+}
+
 // Load reads the environment through Viper and returns a validated config.
 // It does not read dotenv files: loading those, if needed for local tooling,
 // belongs outside the application process. Production configuration is always
 // supplied by the process environment.
 func Load() (Config, error) {
 	v := viper.New()
+	v.AllowEmptyEnv(true)
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.SetDefault("ENVIRONMENT", "development")
@@ -95,6 +109,12 @@ func Load() (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode configuration: %w", err)
 	}
+
+	appPort, err := parsePort("APP_PORT", cfg.AppPort)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.AppPort = appPort
 
 	ttl, err := parsePositiveDuration("PAYMENT_RESERVATION_TTL", v.GetString("PAYMENT_RESERVATION_TTL"))
 	if err != nil {
