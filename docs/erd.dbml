@@ -1,0 +1,860 @@
+// ============================================================
+// BC Importados
+// ERD logico v1
+//
+// Derivado de reglas confirmadas de docs/specs.md v0.1.
+//
+// IMPORTANTE:
+// - PK/FK, nombres, longitudes y tipos son sugerencias tecnicas.
+// - No existe esquema fisico aprobado.
+// - Los tipos SQL son genericos.
+// - El motor/driver sigue pendiente (ADR-002).
+// ============================================================
+
+
+// ============================================================
+// IDENTIDAD Y PERMISOS
+// ============================================================
+
+Table usuario {
+  id bigint [pk]
+
+  correo varchar(254) [not null, unique]
+  credencial_hash varchar(255)
+  estado varchar(30) [not null]
+  origen varchar(30) [not null]
+  es_dueno_inicial boolean [not null]
+
+  Note: '''
+  El correo es unico.
+
+  Los campos exactos del perfil y la politica de
+  sesiones/enlaces no estan definidos.
+
+  El origen distingue cuentas publicas de administrativas.
+
+  Si estas pueden comprar: pendiente.
+  '''
+}
+
+
+Table rol {
+  id bigint [pk]
+
+  nombre varchar(100) [not null]
+}
+
+
+Table permiso {
+  id bigint [pk]
+
+  accion varchar(150) [not null]
+}
+
+
+Table usuario_rol {
+  usuario_id bigint [not null]
+  rol_id bigint [not null]
+
+  indexes {
+    (usuario_id, rol_id) [pk]
+  }
+}
+
+
+Table rol_permiso {
+  rol_id bigint [not null]
+  permiso_id bigint [not null]
+
+  indexes {
+    (rol_id, permiso_id) [pk]
+  }
+}
+
+
+TableGroup "Identidad y permisos" {
+  usuario
+  rol
+  permiso
+  usuario_rol
+  rol_permiso
+}
+
+
+// ============================================================
+// CATALOGO
+// ============================================================
+
+Table marca {
+  id bigint [pk]
+
+  nombre varchar(150) [not null]
+  estado varchar(30) [not null]
+}
+
+
+Table categoria {
+  id bigint [pk]
+
+  nombre varchar(150) [not null]
+  estado varchar(30) [not null]
+
+  Note: '''
+  La regla "maximo un padre y sin ciclos" es propuesta,
+  no confirmada.
+
+  categoria_jerarquia expresa la relacion documentada
+  sin imponer esa restriccion.
+
+  Tampoco se afirma herencia fisica a Variante.
+  '''
+}
+
+
+Table categoria_jerarquia {
+  padre_id bigint [not null]
+  hija_id bigint [not null]
+
+  indexes {
+    (padre_id, hija_id) [pk]
+  }
+}
+
+
+Table producto {
+  id bigint [pk]
+
+  marca_id bigint [not null]
+  nombre varchar(255) [not null]
+  descripcion text
+  estado varchar(30) [not null]
+  metodologia_rotacion varchar(4) [not null]
+}
+
+
+Table producto_categoria {
+  producto_id bigint [not null]
+  categoria_id bigint [not null]
+
+  indexes {
+    (producto_id, categoria_id) [pk]
+  }
+}
+
+
+Table variante {
+  id bigint [pk]
+
+  producto_id bigint [not null]
+  codigo varchar(100) [not null]
+  nombre varchar(255) [not null]
+  descripcion text
+  precio_minorista decimal(18,2) [not null]
+  precio_mayorista decimal(18,2) [not null]
+  estado varchar(30) [not null]
+}
+
+
+Table imagen_variante {
+  id bigint [pk]
+
+  variante_id bigint [not null]
+  referencia_imagen varchar(2048) [not null]
+  es_principal boolean [not null]
+}
+
+
+Table proveedor {
+  id bigint [pk]
+
+  nombre varchar(255) [not null]
+  correo varchar(254)
+  telefono varchar(50)
+  web varchar(2048)
+}
+
+
+TableGroup "Catalogo" {
+  marca
+  categoria
+  categoria_jerarquia
+  producto
+  producto_categoria
+  variante
+  imagen_variante
+  proveedor
+}
+
+
+// ============================================================
+// INVENTARIO Y VENTA EXTERNA
+// ============================================================
+
+Table lote {
+  id bigint [pk]
+
+  variante_id bigint [not null]
+  proveedor_id bigint [not null]
+  unidades_ingresadas integer [not null]
+  costo_unitario decimal(18,2) [not null]
+  fecha_ingreso timestamp [not null]
+}
+
+
+Table venta_externa {
+  id bigint [pk]
+
+  responsable_id bigint [not null]
+  fecha timestamp [not null]
+}
+
+
+Table detalle_venta_externa {
+  id bigint [pk]
+
+  venta_externa_id bigint [not null]
+  variante_id bigint [not null]
+  unidades integer [not null]
+}
+
+
+Table movimiento_stock {
+  id bigint [pk]
+
+  lote_id bigint [not null]
+
+  responsable_id bigint
+  pedido_id bigint
+  detalle_venta_externa_id bigint
+
+  tipo varchar(30) [not null]
+  unidades integer [not null]
+  fecha timestamp [not null]
+
+  motivo text
+  origen varchar(100)
+}
+
+
+Table reserva_stock {
+  id bigint [pk]
+
+  pedido_id bigint [not null]
+  lote_id bigint [not null]
+  unidades integer [not null]
+  estado varchar(30) [not null]
+
+  vencimiento timestamp
+}
+
+
+Table asignacion_lote {
+  id bigint [pk]
+
+  detalle_pedido_id bigint [not null]
+  lote_id bigint [not null]
+  unidades integer [not null]
+  costo_unitario_historico decimal(18,2) [not null]
+}
+
+
+TableGroup "Inventario y venta externa" {
+  lote
+  venta_externa
+  detalle_venta_externa
+  movimiento_stock
+  reserva_stock
+  asignacion_lote
+}
+
+
+// ============================================================
+// PROMOCIONES Y CUPONES
+// ============================================================
+
+Table promocion {
+  id bigint [pk]
+
+  tipo_beneficio varchar(40) [not null]
+  prioridad integer [not null]
+
+  cantidad_minima integer
+  cantidad_maxima integer
+
+  precio_total_combo decimal(18,2)
+  precio_unitario_especial decimal(18,2)
+
+  Note: '''
+  Se modelan los tres beneficios confirmados y objetivos
+  incluidos/excluidos.
+
+  Quedan sin cerrar la evaluacion de tramos, desempates
+  y repeticion de combos (RFC-005).
+
+  No se fijan esas restricciones.
+  '''
+}
+
+
+Table promocion_producto {
+  promocion_id bigint [not null]
+  producto_id bigint [not null]
+
+  incluido boolean [not null]
+
+  indexes {
+    (promocion_id, producto_id) [pk]
+  }
+}
+
+
+Table promocion_variante {
+  promocion_id bigint [not null]
+  variante_id bigint [not null]
+
+  incluido boolean [not null]
+
+  indexes {
+    (promocion_id, variante_id) [pk]
+  }
+}
+
+
+Table promocion_categoria {
+  promocion_id bigint [not null]
+  categoria_id bigint [not null]
+
+  incluido boolean [not null]
+
+  indexes {
+    (promocion_id, categoria_id) [pk]
+  }
+}
+
+
+Table componente_combo {
+  id bigint [pk]
+
+  promocion_id bigint [not null]
+  cantidad_requerida integer [not null]
+}
+
+
+Table componente_producto {
+  componente_id bigint [not null]
+  producto_id bigint [not null]
+
+  incluido boolean [not null]
+
+  indexes {
+    (componente_id, producto_id) [pk]
+  }
+}
+
+
+Table componente_variante {
+  componente_id bigint [not null]
+  variante_id bigint [not null]
+
+  incluido boolean [not null]
+
+  indexes {
+    (componente_id, variante_id) [pk]
+  }
+}
+
+
+Table componente_categoria {
+  componente_id bigint [not null]
+  categoria_id bigint [not null]
+
+  incluido boolean [not null]
+
+  indexes {
+    (componente_id, categoria_id) [pk]
+  }
+}
+
+
+Table aplicacion_promocion {
+  id bigint [pk]
+
+  pedido_id bigint [not null]
+  promocion_id bigint [not null]
+
+  regla_historica text [not null]
+  descuento_total decimal(18,2) [not null]
+}
+
+
+Table aplicacion_promocion_detalle {
+  aplicacion_id bigint [not null]
+  detalle_pedido_id bigint [not null]
+
+  unidades integer [not null]
+  descuento decimal(18,2) [not null]
+
+  indexes {
+    (aplicacion_id, detalle_pedido_id) [pk]
+  }
+}
+
+
+Table cupon {
+  id bigint [pk]
+
+  codigo varchar(100) [not null]
+  tipo_descuento varchar(30) [not null]
+  valor decimal(18,2) [not null]
+  minimo_compra decimal(18,2) [not null]
+
+  tope_descuento decimal(18,2)
+
+  maximo_usos integer [not null]
+  acumulable boolean [not null]
+
+  vigencia_desde timestamp
+  vigencia_hasta timestamp
+}
+
+
+Table uso_cupon {
+  id bigint [pk]
+
+  cupon_id bigint [not null]
+  pedido_id bigint [not null, unique]
+
+  estado varchar(30) [not null]
+}
+
+
+TableGroup "Promociones y cupones" {
+  promocion
+  promocion_producto
+  promocion_variante
+  promocion_categoria
+
+  componente_combo
+  componente_producto
+  componente_variante
+  componente_categoria
+
+  aplicacion_promocion
+  aplicacion_promocion_detalle
+
+  cupon
+  uso_cupon
+}
+
+
+// ============================================================
+// CARRITO Y AVISOS
+// ============================================================
+
+Table carrito {
+  id bigint [pk]
+
+  usuario_id bigint [not null]
+}
+
+
+Table item_carrito {
+  id bigint [pk]
+
+  carrito_id bigint [not null]
+  variante_id bigint [not null]
+  cantidad integer [not null]
+}
+
+
+Table favorito {
+  usuario_id bigint [not null]
+  variante_id bigint [not null]
+
+  indexes {
+    (usuario_id, variante_id) [pk]
+  }
+}
+
+
+Table suscripcion_reposicion {
+  id bigint [pk]
+
+  variante_id bigint [not null]
+  correo varchar(254) [not null]
+}
+
+
+TableGroup "Carrito y avisos" {
+  carrito
+  item_carrito
+  favorito
+  suscripcion_reposicion
+}
+
+
+// ============================================================
+// PEDIDOS, PAGOS Y AUDITORIA
+// ============================================================
+
+Table pedido {
+  id bigint [pk]
+
+  usuario_id bigint
+
+  estado varchar(30) [not null]
+  fecha_creacion timestamp [not null]
+
+  comprador_nombre varchar(150) [not null]
+  comprador_apellido varchar(150) [not null]
+  comprador_correo varchar(254) [not null]
+  comprador_telefono varchar(50) [not null]
+  comprador_dni varchar(30) [not null]
+
+  forma_entrega varchar(30) [not null]
+  domicilio_entrega text
+
+  distancia_vial decimal(12,3)
+
+  tarifa_envio_historica decimal(18,2) [not null]
+
+  medio_pago varchar(30) [not null]
+
+  subtotal_base decimal(18,2) [not null]
+  subtotal_promocionado decimal(18,2) [not null]
+  descuento_cupon decimal(18,2) [not null]
+  total decimal(18,2) [not null]
+
+  Note: '''
+  Datos del comprador, precios y entrega son copias historicas.
+
+  usuario_id es opcional para invitados.
+
+  Estados definitivos y conciliacion/cancelacion tardia
+  siguen abiertos (RFC-004).
+  '''
+}
+
+
+Table detalle_pedido {
+  id bigint [pk]
+
+  pedido_id bigint [not null]
+  variante_id bigint [not null]
+
+  variante_nombre_historico varchar(255) [not null]
+  variante_codigo_historico varchar(100) [not null]
+
+  cantidad integer [not null]
+
+  precio_minorista_historico decimal(18,2) [not null]
+  precio_aplicado_historico decimal(18,2) [not null]
+  descuento_historico decimal(18,2) [not null]
+  subtotal_historico decimal(18,2) [not null]
+}
+
+
+Table intento_pago {
+  id bigint [pk]
+
+  pedido_id bigint [not null]
+
+  medio varchar(30) [not null]
+  importe decimal(18,2) [not null]
+  estado varchar(30) [not null]
+
+  identificador_externo varchar(255)
+
+  fecha_creacion timestamp [not null]
+  fecha_acreditacion_cobro timestamp
+}
+
+
+Table factura {
+  id bigint [pk]
+
+  pedido_id bigint [not null]
+
+  referencia_externa varchar(255)
+
+  estado_emision varchar(30) [not null]
+  resultado_externo text
+
+  Note: '''
+  No se impone unicidad por pedido.
+
+  Numero de documentos, contrato fiscal e idempotencia
+  siguen pendientes (RFC-004/RFC-006).
+  '''
+}
+
+
+Table auditoria_pedido {
+  id bigint [pk]
+
+  pedido_id bigint [not null]
+  actor_usuario_id bigint
+
+  actor_tipo varchar(30) [not null]
+  fecha timestamp [not null]
+  accion varchar(100) [not null]
+
+  datos_anteriores text
+  datos_nuevos text
+}
+
+
+TableGroup "Pedidos, pagos y auditoria" {
+  pedido
+  detalle_pedido
+  intento_pago
+  factura
+  auditoria_pedido
+}
+
+
+// ============================================================
+// TIENDA Y ENTREGA
+// ============================================================
+
+Table configuracion_tienda {
+  id bigint [pk]
+
+  ubicacion_local text [not null]
+  distancia_vial_maxima decimal(12,3) [not null]
+  efectivo_habilitado boolean [not null]
+
+  Note: '''
+  Unidad y fronteras exactas de los rangos de distancia
+  pendientes.
+
+  El pedido conserva la tarifa y distancia cotizadas.
+  '''
+}
+
+
+Table tarifa_distancia {
+  id bigint [pk]
+
+  configuracion_id bigint [not null]
+
+  distancia_desde decimal(12,3) [not null]
+  distancia_hasta decimal(12,3) [not null]
+  importe decimal(18,2) [not null]
+}
+
+
+TableGroup "Tienda y entrega" {
+  configuracion_tienda
+  tarifa_distancia
+}
+
+
+// ============================================================
+// RELACIONES
+// ============================================================
+//
+// Sintaxis:
+//   >  many-to-one
+//   <  one-to-many
+//   -  one-to-one
+//
+// La nullability de la FK determina si la referencia
+// puede estar ausente.
+// ============================================================
+
+
+// ------------------------------------------------------------
+// IDENTIDAD Y PERMISOS
+// ------------------------------------------------------------
+
+Ref: usuario_rol.usuario_id > usuario.id
+Ref: usuario_rol.rol_id > rol.id
+
+Ref: rol_permiso.rol_id > rol.id
+Ref: rol_permiso.permiso_id > permiso.id
+
+
+// ------------------------------------------------------------
+// CATALOGO
+// ------------------------------------------------------------
+
+Ref: producto.marca_id > marca.id
+
+Ref: categoria_jerarquia.padre_id > categoria.id
+Ref: categoria_jerarquia.hija_id > categoria.id
+
+Ref: producto_categoria.producto_id > producto.id
+Ref: producto_categoria.categoria_id > categoria.id
+
+Ref: variante.producto_id > producto.id
+
+Ref: imagen_variante.variante_id > variante.id
+
+Ref: lote.variante_id > variante.id
+Ref: lote.proveedor_id > proveedor.id
+
+
+// ------------------------------------------------------------
+// INVENTARIO Y VENTA EXTERNA
+// ------------------------------------------------------------
+
+Ref: venta_externa.responsable_id > usuario.id
+
+Ref: detalle_venta_externa.venta_externa_id > venta_externa.id
+Ref: detalle_venta_externa.variante_id > variante.id
+
+Ref: movimiento_stock.lote_id > lote.id
+
+// Opcionales según modelo lógico original.
+Ref: movimiento_stock.responsable_id > usuario.id
+Ref: movimiento_stock.pedido_id > pedido.id
+Ref: movimiento_stock.detalle_venta_externa_id > detalle_venta_externa.id
+
+Ref: reserva_stock.pedido_id > pedido.id
+Ref: reserva_stock.lote_id > lote.id
+
+Ref: asignacion_lote.detalle_pedido_id > detalle_pedido.id
+Ref: asignacion_lote.lote_id > lote.id
+
+
+// ------------------------------------------------------------
+// PROMOCIONES - OBJETIVOS
+// ------------------------------------------------------------
+
+Ref: promocion_producto.promocion_id > promocion.id
+Ref: promocion_producto.producto_id > producto.id
+
+Ref: promocion_variante.promocion_id > promocion.id
+Ref: promocion_variante.variante_id > variante.id
+
+Ref: promocion_categoria.promocion_id > promocion.id
+Ref: promocion_categoria.categoria_id > categoria.id
+
+
+// ------------------------------------------------------------
+// PROMOCIONES - COMBOS
+// ------------------------------------------------------------
+
+Ref: componente_combo.promocion_id > promocion.id
+
+Ref: componente_producto.componente_id > componente_combo.id
+Ref: componente_producto.producto_id > producto.id
+
+Ref: componente_variante.componente_id > componente_combo.id
+Ref: componente_variante.variante_id > variante.id
+
+Ref: componente_categoria.componente_id > componente_combo.id
+Ref: componente_categoria.categoria_id > categoria.id
+
+
+// ------------------------------------------------------------
+// APLICACION DE PROMOCIONES
+// ------------------------------------------------------------
+
+Ref: aplicacion_promocion.pedido_id > pedido.id
+Ref: aplicacion_promocion.promocion_id > promocion.id
+
+Ref: aplicacion_promocion_detalle.aplicacion_id > aplicacion_promocion.id
+Ref: aplicacion_promocion_detalle.detalle_pedido_id > detalle_pedido.id
+
+
+// ------------------------------------------------------------
+// CUPONES
+// ------------------------------------------------------------
+
+Ref: uso_cupon.cupon_id > cupon.id
+
+// pedido_id es UNIQUE.
+// Esto representa como maximo un uso de cupon por pedido.
+Ref: uso_cupon.pedido_id > pedido.id
+
+
+// ------------------------------------------------------------
+// CARRITO Y AVISOS
+// ------------------------------------------------------------
+
+Ref: carrito.usuario_id > usuario.id
+
+Ref: item_carrito.carrito_id > carrito.id
+Ref: item_carrito.variante_id > variante.id
+
+Ref: favorito.usuario_id > usuario.id
+Ref: favorito.variante_id > variante.id
+
+Ref: suscripcion_reposicion.variante_id > variante.id
+
+
+// ------------------------------------------------------------
+// PEDIDOS
+// ------------------------------------------------------------
+
+// usuario_id nullable:
+// el pedido puede corresponder a un usuario registrado
+// o a una compra invitada.
+Ref: pedido.usuario_id > usuario.id
+
+Ref: detalle_pedido.pedido_id > pedido.id
+Ref: detalle_pedido.variante_id > variante.id
+
+Ref: intento_pago.pedido_id > pedido.id
+
+
+// ------------------------------------------------------------
+// FACTURACION
+// ------------------------------------------------------------
+//
+// La especificacion original dice:
+//
+//   pedido -- factura : asociada (cardinalidad pendiente)
+//
+// Por lo tanto existe la FK, pero NO se agrega UNIQUE a
+// factura.pedido_id.
+//
+// Esto permite representar la asociacion sin cerrar todavia
+// la cardinalidad definitiva.
+// ------------------------------------------------------------
+
+Ref: factura.pedido_id > pedido.id
+
+
+// ------------------------------------------------------------
+// AUDITORIA
+// ------------------------------------------------------------
+
+Ref: auditoria_pedido.pedido_id > pedido.id
+
+// Nullable porque el actor tambien puede ser el sistema.
+Ref: auditoria_pedido.actor_usuario_id > usuario.id
+
+
+// ------------------------------------------------------------
+// TIENDA Y ENTREGA
+// ------------------------------------------------------------
+
+Ref: tarifa_distancia.configuracion_id > configuracion_tienda.id
+
+
+// ============================================================
+// NOTAS GENERALES DEL MODELO
+// ============================================================
+
+Project "BC Importados" {
+  database_type: "Generic SQL"
+
+  Note: '''
+  ERD logico de v1.
+
+  PK/FK, nombres de columnas, longitudes y tipos son
+  sugerencias de modelo logico, no decisiones del equipo
+  sobre un motor SQL concreto.
+
+  Los atributos de implementacion sin contrato definido
+  (tokens, sesiones, invitaciones e integraciones)
+  no se convierten en tablas aqui.
+
+  Los invitados guardan carrito/favoritos localmente.
+
+  No se incluyen RFC futuros fuera de v1.
+  '''
+}
