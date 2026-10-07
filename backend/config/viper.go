@@ -31,6 +31,7 @@ type Config struct {
 
 	MercadoPagoAccessToken   string `mapstructure:"MERCADOPAGO_ACCESS_TOKEN"`
 	MercadoPagoWebhookSecret string `mapstructure:"MERCADOPAGO_WEBHOOK_SECRET"`
+	PublicBaseURL            string `mapstructure:"PUBLIC_BASE_URL"`
 
 	FiscalAPIBaseURL string `mapstructure:"FISCAL_API_BASE_URL"`
 	FiscalAPIToken   string `mapstructure:"FISCAL_API_TOKEN"`
@@ -130,6 +131,9 @@ func Load() (Config, error) {
 	}
 	if strings.TrimSpace(cfg.OrderAccessTokenSecret) == "" {
 		return Config{}, fmt.Errorf("ORDER_ACCESS_TOKEN_SECRET is required")
+	}
+	if strings.TrimSpace(cfg.PublicBaseURL) == "" {
+		return Config{}, fmt.Errorf("PUBLIC_BASE_URL is required")
 	}
 
 	return cfg, nil

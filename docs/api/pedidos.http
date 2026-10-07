@@ -1,0 +1,475 @@
+# =============================================================================
+# Pedidos — carrito, checkout, consulta y transiciones (módulo de Nicolás)
+# =============================================================================
+# Cómo usar este archivo: extensión "REST Client" de VS Code (humao.rest-client).
+# Cada bloque "###" se ejecuta con el link "Send Request" que aparece arriba.
+#
+# Reglas:
+#  - Mirá el STATUS, no el cuerpo. Arriba de cada request está escrito el que se espera.
+#  - Los secretos NUNCA se commitean. Los correos y contraseñas de prueba van en
+#    .vscode/settings.json (carpeta ignorada por git):
+#      "rest-client.environmentVariables": { "$shared": {
+#          "correoCliente": "...", "contrasenaCliente": "...",
+#          "correoDueno": "...",   "contrasenaDueno": "..." } }
+#  - Un endpoint que anda en localhost y no en la URL pública, para esta materia, no existe:
+#    después del merge, descomentá la @base de producción y corré el archivo ENTERO.
+#
+# Montos en centavos (int64): 1500000 = $15.000,00. Ver ADR-004.
+# =============================================================================
+
+@base = http://localhost:8080
+# @base = https://URL-PUBLICA-DE-PRODUCCION
+
+# --- Ids del seed (completar con los que deja el seed de Genaro/Agustín) -----
+# La demo necesita una variante con stock de sobra, una con UNA sola unidad y una sin stock.
+@varianteConStock = REEMPLAZAR-ID-VARIANTE-CON-STOCK
+@varianteUltimaUnidad = REEMPLAZAR-ID-VARIANTE-CON-UNA-UNIDAD
+@varianteSinStock = REEMPLAZAR-ID-VARIANTE-SIN-STOCK
+
+# =============================================================================
+# 0. SESIONES
+# Los nombres de los campos del login los define Yasmín (docs/api/identidad.http):
+# si cambian, se ajusta acá. Con el token de la respuesta se arman las variables.
+# =============================================================================
+
+### Login de un cliente → 200 con el token
+# @name loginCliente
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "{{correoCliente}}", "contrasena": "{{contrasenaCliente}}" }
+
+@tokenCliente = {{loginCliente.response.body.$.token}}
+
+### Login del dueño (tiene el permiso pedidos.gestionar) → 200 con el token
+# @name loginDueno
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{ "correo": "{{correoDueno}}", "contrasena": "{{contrasenaDueno}}" }
+
+@tokenDueno = {{loginDueno.response.body.$.token}}
+
+
+# =============================================================================
+# 1. EL FLUJO PRINCIPAL, DE PUNTA A PUNTA  (el recorrido de la demo del martes)
+# =============================================================================
+# 1. GET  /api/catalogo/variantes?q=...        ver el catálogo
+# 2. POST /api/pedidos                         crear el pedido (201, reserva stock)
+# 3. POST /api/pedidos/{id}/pago               iniciar Mercado Pago (devuelve init_point)
+# 4. POST /api/pagos/webhook                   simular la aprobación → CONFIRMADO
+# 5. GET  /api/pedidos/publico/{token}         el invitado consulta su pedido
+# 6. POST /api/admin/pedidos/{id}/despacho     → DESPACHADO
+# 7. POST /api/admin/pedidos/{id}/entrega      → COMPLETADO
+# Corrélo de arriba hacia abajo, en orden.
+
+### Paso 1 — ver el catálogo → 200
+GET {{base}}/api/catalogo/variantes?q=perfume
+
+### Paso 2 — crear el pedido como INVITADO (envío a 800 m) → 201 con el pedido y su tokenAcceso
+# Estado inicial: PENDIENTE_DE_PAGO / PENDIENTE, vence en 15 minutos. Reserva el stock.
+# @name flujo
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 2 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "ENVIO",
+  "domicilio": "San Martín 123, Rosario",
+  "distanciaMetros": 800,
+  "medioPago": "MERCADO_PAGO"
+}
+
+@pedidoId = {{flujo.response.body.$.id}}
+@tokenAcceso = {{flujo.response.body.$.tokenAcceso}}
+
+### Paso 3 — iniciar el pago con Mercado Pago (módulo de Agustín) → 200 con init_point
+# ⚠ A confirmar con Agustín: cómo se manda el token del invitado en esta ruta (acá, un header).
+POST {{base}}/api/pedidos/{{pedidoId}}/pago
+X-Token-Acceso: {{tokenAcceso}}
+
+### Paso 4 — simular la aprobación del pago (webhook de Mercado Pago) → 200
+# El webhook verifica la firma con MERCADOPAGO_WEBHOOK_SECRET y le pregunta el pago al proveedor:
+# nunca confía en el cuerpo. Sin firma válida → 401.
+# ⚠ A confirmar con Agustín: headers de firma y payment_id de sandbox.
+POST {{base}}/api/pagos/webhook
+Content-Type: application/json
+x-signature: {{firmaWebhook}}
+x-request-id: {{requestIdWebhook}}
+
+{ "type": "payment", "data": { "id": "{{pagoIdSandbox}}" } }
+
+### Paso 5 — el invitado consulta su pedido por el enlace privado → 200, estado CONFIRMADO / APROBADO
+GET {{base}}/api/pedidos/publico/{{tokenAcceso}}
+
+### Paso 6 — despachar → 200, estado DESPACHADO
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/despacho
+Authorization: Bearer {{tokenDueno}}
+
+### Paso 7 — entregar → 200, estado COMPLETADO
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/entrega
+Authorization: Bearer {{tokenDueno}}
+
+
+# =============================================================================
+# 2. LAS SEIS REQUESTS QUE HACEN LA DEMO DEL MARTES
+# =============================================================================
+
+### Demo 1 — el flujo feliz completo → 201 con el pedido y su token
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "MERCADO_PAGO"
+}
+
+### Demo 2 — pidiendo más unidades de las que hay → 409 ENUMERANDO qué falta
+# El cuerpo trae detalles: { "<varianteId>": <unidades disponibles> }. Un 500 acá estaría mal.
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteUltimaUnidad}}", "unidades": 3 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "MERCADO_PAGO"
+}
+
+### Demo 3 — mandando el precio en el body → 201, pero el pedido se crea con el precio del SERVIDOR
+# Los campos precioUnitarioCentavos, totalCentavos, estadoPago y usuarioId se ignoran.
+# Mirá que totalCentavos de la respuesta NO es 1.
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1, "precioUnitarioCentavos": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "MERCADO_PAGO",
+  "precioUnitarioCentavos": 1,
+  "totalCentavos": 1,
+  "estadoPago": "APROBADO",
+  "usuarioId": "00000000-0000-0000-0000-000000000000"
+}
+
+### Demo 4 — un envío fuera de la cobertura → 409 ofreciendo retiro (no un costo inventado)
+# La cobertura de la configuración de prueba llega hasta 5000 m.
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "ENVIO",
+  "domicilio": "Ruta 9 km 40, Pueblo lejano",
+  "distanciaMetros": 5001,
+  "medioPago": "MERCADO_PAGO"
+}
+
+### Demo 5a — preparación: un pedido de OTRA persona (el dueño) → 201
+# @name pedidoDeOtro
+POST {{base}}/api/pedidos
+Content-Type: application/json
+Authorization: Bearer {{tokenDueno}}
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Dueño", "apellido": "Local", "correo": "dueno@example.com", "telefono": "3415550001", "dni": "20111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "MERCADO_PAGO"
+}
+
+@idDeUnPedidoAjeno = {{pedidoDeOtro.response.body.$.id}}
+
+### Demo 5b — con el token de un cliente, pidiendo el pedido de OTRO → 404 (no 403)
+# Un 403 confirmaría que el pedido existe. Es el mismo 404 que un id inexistente.
+GET {{base}}/api/pedidos/{{idDeUnPedidoAjeno}}
+Authorization: Bearer {{tokenCliente}}
+
+### Demo 6a — preparación: un pedido que todavía no fue pagado → 201 (PENDIENTE_DE_PAGO)
+# @name pedidoPendiente
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "ENVIO",
+  "domicilio": "San Martín 123, Rosario",
+  "distanciaMetros": 800,
+  "medioPago": "MERCADO_PAGO"
+}
+
+@idPendiente = {{pedidoPendiente.response.body.$.id}}
+
+### Demo 6b — despachar un pedido que todavía no fue pagado → 409 (no 500)
+# "No se puede despachar un pedido que todavía no fue pagado. Esperá la aprobación del pago."
+POST {{base}}/api/admin/pedidos/{{idPendiente}}/despacho
+Authorization: Bearer {{tokenDueno}}
+
+### Demo 7 — cancelar dos veces el mismo pedido: la primera → 200, la segunda → 409 (el stock no se devuelve dos veces)
+POST {{base}}/api/admin/pedidos/{{idPendiente}}/cancelacion
+Content-Type: application/json
+Authorization: Bearer {{tokenDueno}}
+
+{ "motivo": "El cliente lo pidió por WhatsApp" }
+
+###
+POST {{base}}/api/admin/pedidos/{{idPendiente}}/cancelacion
+Content-Type: application/json
+Authorization: Bearer {{tokenDueno}}
+
+{ "motivo": "Segundo intento" }
+
+
+# =============================================================================
+# 3. CHECKOUT — POST /api/pedidos   (sesión opcional: el invitado compra igual)
+# =============================================================================
+
+### Checkout, el que anda → 201 (cliente con sesión: queda vinculado a su cuenta)
+POST {{base}}/api/pedidos
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "EFECTIVO"
+}
+
+### Checkout, body inválido → 400 con detalles.campos (no 500)
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{ "items": [], "comprador": { "nombre": "", "correo": "no-es-un-correo", "dni": "12.345" }, "modoEntrega": "ENVIO", "medioPago": "BITCOIN" }
+
+### Checkout, variante que no existe → 404
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "00000000-0000-0000-0000-000000000000", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "MERCADO_PAGO"
+}
+
+### Checkout, efectivo con envío → 409 (el efectivo solo existe con retiro)
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "ENVIO",
+  "domicilio": "San Martín 123, Rosario",
+  "distanciaMetros": 800,
+  "medioPago": "EFECTIVO"
+}
+
+
+# =============================================================================
+# 4. CONSULTA DEL PEDIDO
+# =============================================================================
+
+### Mis pedidos, paginados → 200 { items, total, pagina, tamano }
+GET {{base}}/api/pedidos?pagina=1&tamano=20
+Authorization: Bearer {{tokenCliente}}
+
+### Mis pedidos con una página que no es número → 400
+GET {{base}}/api/pedidos?pagina=abc
+Authorization: Bearer {{tokenCliente}}
+
+### Mis pedidos sin sesión → 401
+GET {{base}}/api/pedidos
+
+### Detalle de un pedido propio → 200 (cambiar el id por uno del listado anterior)
+GET {{base}}/api/pedidos/{{pedidoId}}
+Authorization: Bearer {{tokenCliente}}
+
+### Detalle con un id que no es un uuid → 404
+GET {{base}}/api/pedidos/42
+Authorization: Bearer {{tokenCliente}}
+
+### Detalle de un pedido que no existe → 404
+GET {{base}}/api/pedidos/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{tokenCliente}}
+
+### Enlace privado del invitado → 200 con la vista REDUCIDA (sin id, usuario, correo ni DNI)
+GET {{base}}/api/pedidos/publico/{{tokenAcceso}}
+
+### Enlace privado con un token de largo incorrecto → 404
+GET {{base}}/api/pedidos/publico/token-invalido
+
+### Enlace privado con un token que no existe → 404
+GET {{base}}/api/pedidos/publico/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+
+# =============================================================================
+# 5. CARRITO DEL CLIENTE REGISTRADO  (el del invitado vive en el navegador)
+# =============================================================================
+
+### Ver mi carrito → 200 { items, totalEstimadoCentavos }
+GET {{base}}/api/carrito
+Authorization: Bearer {{tokenCliente}}
+
+### Ver el carrito sin sesión → 401
+GET {{base}}/api/carrito
+
+### Agregar una variante → 201 (línea nueva) o 200 (sumó unidades a la que ya estaba)
+# @name carritoAgregar
+POST {{base}}/api/carrito/items
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "varianteId": "{{varianteConStock}}", "unidades": 2 }
+
+@itemId = {{carritoAgregar.response.body.$.items[0].id}}
+
+### Agregar más unidades de las disponibles → 409 con detalles { "<varianteId>": <disponible> }
+POST {{base}}/api/carrito/items
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "varianteId": "{{varianteUltimaUnidad}}", "unidades": 3 }
+
+### Agregar con unidades inválidas → 400
+POST {{base}}/api/carrito/items
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "varianteId": "{{varianteConStock}}", "unidades": 0 }
+
+### Agregar una variante que no existe → 404
+POST {{base}}/api/carrito/items
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "varianteId": "00000000-0000-0000-0000-000000000000", "unidades": 1 }
+
+### Cambiar las unidades de una línea → 200
+PATCH {{base}}/api/carrito/items/{{itemId}}
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "unidades": 3 }
+
+### Cambiar las unidades con un valor inválido → 400
+PATCH {{base}}/api/carrito/items/{{itemId}}
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "unidades": -1 }
+
+### Cambiar una línea que no es mía o no existe → 404
+PATCH {{base}}/api/carrito/items/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+Authorization: Bearer {{tokenCliente}}
+
+{ "unidades": 1 }
+
+### Quitar una línea → 204
+DELETE {{base}}/api/carrito/items/{{itemId}}
+Authorization: Bearer {{tokenCliente}}
+
+### Quitar una línea que no existe → 404
+DELETE {{base}}/api/carrito/items/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{tokenCliente}}
+
+### Vaciar el carrito → 204
+DELETE {{base}}/api/carrito
+Authorization: Bearer {{tokenCliente}}
+
+
+# =============================================================================
+# 6. ADMINISTRACIÓN DE PEDIDOS  (todo con el permiso pedidos.gestionar)
+# =============================================================================
+
+### Listado con filtros → 200
+GET {{base}}/api/admin/pedidos?estado=CONFIRMADO&desde=2026-10-01&hasta=2026-10-31&pagina=1&tamano=20
+Authorization: Bearer {{tokenDueno}}
+
+### Listado con un estado inventado → 400
+GET {{base}}/api/admin/pedidos?estado=VOLANDO
+Authorization: Bearer {{tokenDueno}}
+
+### Listado con el token de un CLIENTE → 403 (no tiene pedidos.gestionar)
+GET {{base}}/api/admin/pedidos
+Authorization: Bearer {{tokenCliente}}
+
+### Detalle completo con comprador y pago → 200
+GET {{base}}/api/admin/pedidos/{{pedidoId}}
+Authorization: Bearer {{tokenDueno}}
+
+### Detalle de un pedido que no existe → 404
+GET {{base}}/api/admin/pedidos/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{tokenDueno}}
+
+### Despachar un pedido que no existe → 404
+POST {{base}}/api/admin/pedidos/00000000-0000-0000-0000-000000000000/despacho
+Authorization: Bearer {{tokenDueno}}
+
+### Despachar sin sesión → 401
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/despacho
+
+### Entregar un pedido que no existe → 404
+POST {{base}}/api/admin/pedidos/00000000-0000-0000-0000-000000000000/entrega
+Authorization: Bearer {{tokenDueno}}
+
+### Entregar un envío que todavía no fue despachado → 409
+POST {{base}}/api/admin/pedidos/{{idPendiente}}/entrega
+Authorization: Bearer {{tokenDueno}}
+
+### Cobro en efectivo de un pedido que no existe → 404
+POST {{base}}/api/admin/pedidos/00000000-0000-0000-0000-000000000000/cobro-efectivo
+Authorization: Bearer {{tokenDueno}}
+
+### Cobro en efectivo de un pedido de Mercado Pago → 409
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/cobro-efectivo
+Authorization: Bearer {{tokenDueno}}
+
+### Preparación: un retiro en efectivo → 201, nace CONFIRMADO / PENDIENTE y sin vencimiento
+# @name retiroEfectivo
+POST {{base}}/api/pedidos
+Content-Type: application/json
+
+{
+  "items": [{ "varianteId": "{{varianteConStock}}", "unidades": 1 }],
+  "comprador": { "nombre": "Ana", "apellido": "Pérez", "correo": "ana@example.com", "telefono": "3415550000", "dni": "30111222" },
+  "modoEntrega": "RETIRO",
+  "medioPago": "EFECTIVO"
+}
+
+@idRetiroEfectivo = {{retiroEfectivo.response.body.$.id}}
+
+### Cobro en efectivo de ese retiro → 200, COMPLETADO y APROBADO
+# Registra cobro, entrega y confirmación del stock en una sola acción.
+POST {{base}}/api/admin/pedidos/{{idRetiroEfectivo}}/cobro-efectivo
+Authorization: Bearer {{tokenDueno}}
+
+### Cancelar un pedido que no existe → 404
+POST {{base}}/api/admin/pedidos/00000000-0000-0000-0000-000000000000/cancelacion
+Content-Type: application/json
+Authorization: Bearer {{tokenDueno}}
+
+{ "motivo": "Prueba" }
+
+### Cancelar sin motivo → 400
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/cancelacion
+Content-Type: application/json
+Authorization: Bearer {{tokenDueno}}
+
+{ "motivo": "" }
+
+### Cancelar un pedido COMPLETADO → 409
+# Un pedido pagado y cancelado devuelve además un "aviso": el reintegro se hace a mano en Mercado Pago.
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/cancelacion
+Content-Type: application/json
+Authorization: Bearer {{tokenDueno}}
+
+{ "motivo": "Intento de cancelar un pedido ya entregado" }

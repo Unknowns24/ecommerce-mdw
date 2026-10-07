@@ -518,6 +518,26 @@ Referencias técnicas de mapas consultadas para distinguir servicios: [API de No
 
 ## 9. Fuera de alcance
 
+### Fuera de alcance de esta entrega (Parcial I — 06/10/2026)
+
+El núcleo obligatorio del Parcial I es: identidad con RBAC (SPEC-H01, H02, H03), catálogo con CRUD completo (SPEC-H04, H05, H08), carrito y checkout (SPEC-H07, H13), pedido con copia histórica y reserva de stock por lotes (SPEC-H09, H13), Mercado Pago en sandbox (SPEC-H14), retiro en efectivo (SPEC-H15), consulta de pedido (SPEC-H16) y transiciones de despacho/entrega/cancelación (SPEC-H17, H18), desplegado en producción.
+
+Lo siguiente está descripto en sus historias correspondientes (son parte de la visión completa del producto) pero **no se implementa para esta entrega**; vuelve para el Parcial II (17/11/2026):
+
+- Promociones (SPEC-H11) y cupones (SPEC-H12).
+- Facturación con el sistema fiscal / ARCA (SPEC-H19).
+- Estadísticas online (SPEC-H20).
+- Favoritos y avisos de reposición por correo (SPEC-H06).
+- Registro de ventas externas (SPEC-H10).
+- Auditoría de pedidos (parte de SPEC-H21; la configuración de tienda sí entra).
+- Integración con WhatsApp (OpenWA) y con el proveedor de correo (sección 8).
+- Geocodificación real con API de mapas: la distancia de envío llega como parámetro del checkout, sin resolver el domicilio contra un proveedor externo (sección 6, "Entrega").
+- Frontend: el Parcial I se defiende con el backend corriendo en producción y probado con `docs/api/*.http`; las pantallas son el alcance de la clase 9 en adelante (ver `docs/plan-de-trabajo.md`).
+
+Lo que no está recortado por escrito en esta sección, en la defensa cuenta como funcionalidad prometida y no entregada.
+
+### Fuera de alcance del producto completo
+
 - Reseñas de productos.
 - Compra por encargo o venta de unidades sin stock disponible.
 - Múltiples negocios, sucursales o depósitos con stock separado.
@@ -531,6 +551,39 @@ Referencias técnicas de mapas consultadas para distinguir servicios: [API de No
 - Métodos de rotación distintos de FIFO y LIFO.
 - Repetir pedidos con un botón: figuraba en las HU originales, pero no quedó confirmado en el nuevo alcance.
 - App nativa y múltiples idiomas, como propuesta de límite para esta entrega.
+
+### Recorte del Parcial I — carrito, checkout y pedidos
+
+Lo que no está recortado por escrito cuenta, en la defensa, como prometido y no entregado. Esta subsección declara qué quedó dentro y fuera del módulo de pedidos para el Parcial I (06/10/2026). Las rutas y sus respuestas esperadas están en `docs/api/pedidos.http`.
+
+**Implementado (SPEC-H07, H13, H15, H16, H17 y H18, en lo que sigue):**
+
+- **Carrito (H07):** `GET/POST/PATCH/DELETE /api/carrito`. Solo del cliente registrado; el del invitado vive en el navegador (`localStorage`) y el checkout recibe sus items en el body. Las unidades no superan la disponibilidad (409 si la superan) y los totales se recalculan con el catálogo vigente en cada lectura.
+- **Checkout (H13, H15):** `POST /api/pedidos`, con o sin sesión. Revalida en el servidor: el precio sale del catálogo, nunca del body; la identidad sale de la sesión. Retiro o envío, Mercado Pago o efectivo (solo con retiro y si está habilitado). Todo en una transacción: crea el pedido con su copia histórica (comprador, códigos, nombres, precios y entrega) y reserva el stock; si falta stock devuelve 409 enumerando variante → disponible. Mercado Pago nace `PENDIENTE_DE_PAGO` con vencimiento de 15 minutos; efectivo nace `CONFIRMADO` con pago pendiente y sin vencimiento.
+- **Consulta (H16):** `GET /api/pedidos` (propios, paginado), `GET /api/pedidos/{id}` (un pedido ajeno devuelve 404, no 403) y `GET /api/pedidos/publico/{token}` (enlace privado del invitado, con una vista reducida: sin usuario, correo, DNI ni ids internos).
+- **Gestión (H17, H18):** listado y detalle administrativos y las transiciones como sub-recursos (`despacho`, `entrega`, `cobro-efectivo`, `cancelacion`), todas bajo el permiso `pedidos.gestionar`. Solo se permiten transiciones válidas; la cancelación libera el stock, es idempotente, guarda responsable (de la sesión), fecha y motivo, y avisa que el reintegro de un pedido pagado se hace fuera del sistema.
+
+**Decisiones de implementación (cierran puntos que la spec dejaba abiertos):**
+
+- La **distancia de envío llega como parámetro** del checkout (`distanciaMetros`) y se guarda en el pedido; no se integra una API de mapas ni se geocodifica el domicilio. El proveedor de rutas sigue pendiente (ver sección 8).
+- **Rangos de tarifa semiabiertos `[desde, hasta)`** en metros, sin redondear: cada frontera pertenece a un solo rango. La distancia igual al máximo configurado **sí** está cubierta y paga el último rango. Fuera de cobertura, o con configuración incompleta, no se inventa un costo: 409 que ofrece el retiro.
+- **No se permite cancelar un pedido despachado o completado** (propuesta conservadora de la sección 6: reponer lo entregado exige constatar la devolución física).
+- El **registro de la cancelación** (responsable, fecha y motivo) se guarda en el propio pedido; no hay todavía una tabla de auditoría.
+- El **token del enlace del invitado** tiene 32 bytes aleatorios en base64 URL, se entrega una sola vez en la respuesta del checkout y no se escribe en logs. Su vigencia y revocación siguen pendientes (sección 6).
+- La **configuración de la tienda** (efectivo habilitado, distancia máxima y tarifas) se carga con el comando `go run ./cmd/seed-pedidos`; todavía no hay pantalla ni endpoint para editarla.
+
+**Fuera de alcance de esta entrega (vuelve para el Parcial II, 17/11/2026):**
+
+- **Promociones y cupones** (SPEC-H11 y H12): el pedido guarda precio unitario y subtotal, sin descuentos; el total es subtotal más envío.
+- **Facturación** con la API fiscal (SPEC-H19): el cobro en efectivo y la aprobación de Mercado Pago no solicitan factura.
+- **Favoritos y avisos de reposición** (SPEC-H06).
+- **Estadísticas online** (SPEC-H20).
+- **Auditoría de pedidos** como historial consultable, y edición de la configuración de la tienda desde la administración (SPEC-H21).
+- **Notificaciones** por correo y WhatsApp con el enlace privado (SPEC-H16): en esta entrega el enlace se devuelve en la respuesta del checkout.
+- **Geocodificación y cálculo de ruta** con una API de mapas (ver decisión sobre la distancia).
+- **Vencimiento automático** de pedidos de Mercado Pago sin pago y conciliación de pagos tardíos (sección 6): el pedido guarda `vence_en`, pero el módulo de pedidos no lo cancela automáticamente (a confirmar con el módulo de pagos si lo cubre).
+- Unión del carrito local con el de la cuenta al iniciar sesión y plazo de conservación del carrito.
+- Frontend.
 
 ### RFC futuros registrados
 

@@ -27,6 +27,7 @@ Ningún otro paquete debe llamar a `os.Getenv`, `os.LookupEnv` o Viper. La raíz
 | `PAYMENT_RESERVATION_TTL` | No (`15m`) | Duración positiva de la reserva de Mercado Pago |
 | `MERCADOPAGO_ACCESS_TOKEN` | Al habilitar Mercado Pago | Credencial de Mercado Pago |
 | `MERCADOPAGO_WEBHOOK_SECRET` | Al habilitar webhook | Verificación de notificaciones |
+| `PUBLIC_BASE_URL` | Sí | URL pública del backend; arma las `back_urls` y la `notification_url` de Mercado Pago |
 | `FISCAL_API_BASE_URL`, `FISCAL_API_TOKEN` | Al integrar facturación | Adaptador fiscal pendiente de contrato |
 | `OPENWA_BASE_URL`, `OPENWA_TOKEN` | Al integrar WhatsApp | Adaptador de confirmaciones |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Al habilitar correo | Adaptador de correo |

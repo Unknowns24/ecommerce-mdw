@@ -1,0 +1,180 @@
+@base = http://localhost:8080
+# Producción: descomentar después del merge y correr el archivo entero.
+# @base = https://api.tu-dominio.com
+
+# Variantes sembradas por backend/cmd/seed: con stock, con una unidad, sin stock.
+@varianteConStock = 11111111-1111-1111-1111-111111111111
+@varianteUnaUnidad = 22222222-2222-2222-2222-222222222222
+@varianteSinStock = 33333333-3333-3333-3333-333333333333
+@varianteInexistente = 99999999-9999-9999-9999-999999999999
+
+### salud → 200
+GET {{base}}/api/salud
+
+###############################################
+# POST /api/admin/proveedores
+###############################################
+
+### alta de proveedor → 201
+POST {{base}}/api/admin/proveedores
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "nombre": "Distribuidora Central",
+  "correo": "ventas@distribuidora.com"
+}
+
+### alta de proveedor con body inválido (sin nombre) → 400
+POST {{base}}/api/admin/proveedores
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "nombre": ""
+}
+
+### alta de proveedor sin token → 401
+POST {{base}}/api/admin/proveedores
+Content-Type: application/json
+
+{
+  "nombre": "Proveedor sin sesión"
+}
+
+###############################################
+# GET /api/admin/proveedores
+###############################################
+
+### listado paginado → 200
+GET {{base}}/api/admin/proveedores?pagina=1&porPagina=20
+Authorization: Bearer {{tokenDueno}}
+
+### listado con token de cliente → 403
+GET {{base}}/api/admin/proveedores
+Authorization: Bearer {{tokenCliente}}
+
+### listado sin token → 401
+GET {{base}}/api/admin/proveedores
+
+###############################################
+# POST /api/admin/lotes
+###############################################
+
+### ingreso de lote → 201
+POST {{base}}/api/admin/lotes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "varianteId": "{{varianteConStock}}",
+  "proveedorId": "{{proveedorId}}",
+  "unidades": 20,
+  "costoUnitarioCentavos": 150000,
+  "fecha": "2026-10-04T10:00:00Z"
+}
+
+### ingreso de lote con body inválido (faltan campos) → 400
+POST {{base}}/api/admin/lotes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "varianteId": "{{varianteConStock}}"
+}
+
+### ingreso de lote para una variante que no existe → 404
+POST {{base}}/api/admin/lotes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "varianteId": "{{varianteInexistente}}",
+  "proveedorId": "{{proveedorId}}",
+  "unidades": 5,
+  "costoUnitarioCentavos": 100000,
+  "fecha": "2026-10-04T10:00:00Z"
+}
+
+###############################################
+# GET /api/admin/variantes/{id}/stock
+###############################################
+
+### disponible y detalle por lote → 200
+GET {{base}}/api/admin/variantes/{{varianteConStock}}/stock
+Authorization: Bearer {{tokenDueno}}
+
+### variante con una sola unidad → 200, disponible = 1
+GET {{base}}/api/admin/variantes/{{varianteUnaUnidad}}/stock
+Authorization: Bearer {{tokenDueno}}
+
+### variante que no existe → 404
+GET {{base}}/api/admin/variantes/{{varianteInexistente}}/stock
+Authorization: Bearer {{tokenDueno}}
+
+###############################################
+# GET /api/admin/variantes/{id}/movimientos
+###############################################
+
+### historial paginado → 200
+GET {{base}}/api/admin/variantes/{{varianteConStock}}/movimientos?pagina=1&porPagina=20
+Authorization: Bearer {{tokenDueno}}
+
+### movimientos con token de cliente → 403
+GET {{base}}/api/admin/variantes/{{varianteConStock}}/movimientos
+Authorization: Bearer {{tokenCliente}}
+
+### movimientos de una variante que no existe → 404
+GET {{base}}/api/admin/variantes/{{varianteInexistente}}/movimientos
+Authorization: Bearer {{tokenDueno}}
+
+###############################################
+# POST /api/admin/variantes/{id}/ajustes
+###############################################
+
+### ajuste válido → 201
+POST {{base}}/api/admin/variantes/{{varianteConStock}}/ajustes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "loteId": "{{loteId}}",
+  "unidades": -2,
+  "motivo": "Rotura constatada en el local"
+}
+
+### ajuste con body inválido (sin motivo) → 400
+POST {{base}}/api/admin/variantes/{{varianteConStock}}/ajustes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "loteId": "{{loteId}}",
+  "unidades": -2
+}
+
+### ajuste que dejaría stock negativo → 409
+POST {{base}}/api/admin/variantes/{{varianteUnaUnidad}}/ajustes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{
+  "loteId": "{{loteUnaUnidadId}}",
+  "unidades": -5,
+  "motivo": "Intento de ajuste que no debería aplicarse"
+}
+
+###############################################
+# Las tres que se piden primero en la defensa
+###############################################
+
+### sin cookie/token → 401
+GET {{base}}/api/admin/proveedores
+
+### con el rol equivocado (cliente pidiendo algo de administración) → 403
+GET {{base}}/api/admin/proveedores
+Authorization: Bearer {{tokenCliente}}
+
+### con un recurso ajeno/inexistente → 404
+GET {{base}}/api/admin/variantes/{{varianteInexistente}}/stock
+Authorization: Bearer {{tokenDueno}}

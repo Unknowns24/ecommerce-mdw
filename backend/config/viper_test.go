@@ -9,6 +9,7 @@ func TestLoadReadsBoundEnvironmentVariables(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "postgres://user:pass@localhost:5432/bc")
 	t.Setenv("APP_SECRET_KEY", "application-secret")
 	t.Setenv("ORDER_ACCESS_TOKEN_SECRET", "order-secret")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:8080")
 	t.Setenv("APP_PORT", "9090")
 	t.Setenv("PAYMENT_RESERVATION_TTL", "20m")
 	t.Setenv("MAIL_PORT", "2525")
@@ -29,6 +30,7 @@ func TestLoadRejectsInvalidReservationTTL(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "postgres://user:pass@localhost:5432/bc")
 	t.Setenv("APP_SECRET_KEY", "application-secret")
 	t.Setenv("ORDER_ACCESS_TOKEN_SECRET", "order-secret")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:8080")
 	t.Setenv("PAYMENT_RESERVATION_TTL", "0")
 
 	if _, err := Load(); err == nil {
@@ -40,6 +42,7 @@ func TestLoadRejectsEmptyReservationTTL(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "******localhost:5432/bc")
 	t.Setenv("APP_SECRET_KEY", "application-secret")
 	t.Setenv("ORDER_ACCESS_TOKEN_SECRET", "order-secret")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:8080")
 	t.Setenv("PAYMENT_RESERVATION_TTL", "")
 
 	if _, err := Load(); err == nil {
@@ -47,10 +50,21 @@ func TestLoadRejectsEmptyReservationTTL(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsMissingPublicBaseURL(t *testing.T) {
+	t.Setenv("DATABASE_DSN", "postgres://user:pass@localhost:5432/bc")
+	t.Setenv("APP_SECRET_KEY", "application-secret")
+	t.Setenv("ORDER_ACCESS_TOKEN_SECRET", "order-secret")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() succeeded without PUBLIC_BASE_URL")
+	}
+}
+
 func TestLoadRejectsInvalidAppPort(t *testing.T) {
 	t.Setenv("DATABASE_DSN", "******localhost:5432/bc")
 	t.Setenv("APP_SECRET_KEY", "application-secret")
 	t.Setenv("ORDER_ACCESS_TOKEN_SECRET", "order-secret")
+	t.Setenv("PUBLIC_BASE_URL", "http://localhost:8080")
 	t.Setenv("APP_PORT", "70000")
 
 	if _, err := Load(); err == nil {

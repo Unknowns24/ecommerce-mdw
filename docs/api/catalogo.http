@@ -1,0 +1,392 @@
+@base = http://localhost:8080
+# @base = https://api.tu-dominio.com
+@tokenDueno =
+@tokenCliente =
+@productoId = a3dda1ca-2394-5b28-90dc-b1bb35563bf7
+@varianteId = 11111111-1111-1111-1111-111111111111
+@varianteSinStock = 33333333-3333-3333-3333-333333333333
+@categoriaId = f9f03934-e59c-50a5-ad52-3f5e8ecc26ee
+@marcaId = e2b21c5b-1086-5c7f-a341-5c14065489ac
+@productoPruebaId = {{crearProducto.response.body.$.id}}
+@variantePruebaId = {{crearVariante.response.body.$.id}}
+@marcaPruebaId = {{crearMarca.response.body.$.id}}
+@categoriaPruebaId = {{crearCategoria.response.body.$.id}}
+@imagenId = {{agregarImagen.response.body.$.id}}
+@inexistente = 99999999-9999-9999-9999-999999999999
+
+# Ejecutar seed-catalogo y luego seed de inventario antes de las pruebas.
+# Los endpoints de administración requieren el middleware de identidad real.
+
+### buscar con filtro y orden combinados; desempate por id → 200
+GET {{base}}/api/catalogo/variantes?q=love&categoria={{categoriaId}}&orden=precio_asc&pagina=1
+
+### búsqueda sin resultados: lista vacía y total cero → 200
+GET {{base}}/api/catalogo/variantes?q=zzzzzz
+
+### orden inválido → 400
+GET {{base}}/api/catalogo/variantes?orden=otro
+
+### variante activa sin stock visible con disponible false → 200
+GET {{base}}/api/catalogo/variantes/{{varianteSinStock}}
+
+### detalle de variante → 200
+GET {{base}}/api/catalogo/variantes/{{varianteId}}
+
+### detalle con id inválido → 400
+GET {{base}}/api/catalogo/variantes/invalido
+
+### detalle inexistente → 404
+GET {{base}}/api/catalogo/variantes/{{inexistente}}
+
+### árbol público de categorías → 200
+GET {{base}}/api/catalogo/categorias
+
+### marcas públicas → 200
+GET {{base}}/api/catalogo/marcas
+
+### crear productos → 201
+# @name crearProducto
+POST {{base}}/api/admin/productos
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"marcaId":"{{marcaId}}","nombre":"Producto de prueba","descripcion":"Prueba","metodologiaRotacion":"FIFO","categorias":["{{categoriaId}}"]}
+
+### crear productos con body inválido → 400
+POST {{base}}/api/admin/productos
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### listar productos → 200
+GET {{base}}/api/admin/productos?pagina=1&porPagina=24
+Authorization: Bearer {{tokenDueno}}
+
+### listar productos con paginación inválida → 400
+GET {{base}}/api/admin/productos?porPagina=101
+Authorization: Bearer {{tokenDueno}}
+
+### ver productos → 200
+GET {{base}}/api/admin/productos/{{productoPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### ver productos con id inválido → 400
+GET {{base}}/api/admin/productos/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### ver productos inexistente → 404
+GET {{base}}/api/admin/productos/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### editar productos → 200
+PATCH {{base}}/api/admin/productos/{{productoPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Producto de prueba editado"}
+
+### editar productos con body inválido → 400
+PATCH {{base}}/api/admin/productos/{{productoPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### editar productos inexistente → 404
+PATCH {{base}}/api/admin/productos/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Producto de prueba editado"}
+
+### desactivar productos → 204
+DELETE {{base}}/api/admin/productos/{{productoPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar productos con id inválido → 400
+DELETE {{base}}/api/admin/productos/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar productos inexistente → 404
+DELETE {{base}}/api/admin/productos/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### crear variantes → 201
+# @name crearVariante
+POST {{base}}/api/admin/variantes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"productoId":"{{productoId}}","codigo":"PRUEBA-UNICO-001","nombre":"Variante de prueba","precioMinoristaCentavos":10000,"precioMayoristaCentavos":8000}
+
+### crear variantes con body inválido → 400
+POST {{base}}/api/admin/variantes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### listar variantes → 200
+GET {{base}}/api/admin/variantes?pagina=1&porPagina=24
+Authorization: Bearer {{tokenDueno}}
+
+### listar variantes con paginación inválida → 400
+GET {{base}}/api/admin/variantes?porPagina=101
+Authorization: Bearer {{tokenDueno}}
+
+### ver variantes → 200
+GET {{base}}/api/admin/variantes/{{variantePruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### ver variantes con id inválido → 400
+GET {{base}}/api/admin/variantes/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### ver variantes inexistente → 404
+GET {{base}}/api/admin/variantes/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### editar variantes → 200
+PATCH {{base}}/api/admin/variantes/{{variantePruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Variante editada"}
+
+### editar variantes con body inválido → 400
+PATCH {{base}}/api/admin/variantes/{{variantePruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### editar variantes inexistente → 404
+PATCH {{base}}/api/admin/variantes/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Variante editada"}
+
+### desactivar variantes → 204
+DELETE {{base}}/api/admin/variantes/{{variantePruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar variantes con id inválido → 400
+DELETE {{base}}/api/admin/variantes/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar variantes inexistente → 404
+DELETE {{base}}/api/admin/variantes/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### crear marcas → 201
+# @name crearMarca
+POST {{base}}/api/admin/marcas
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Marca de prueba"}
+
+### crear marcas con body inválido → 400
+POST {{base}}/api/admin/marcas
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### listar marcas → 200
+GET {{base}}/api/admin/marcas?pagina=1&porPagina=24
+Authorization: Bearer {{tokenDueno}}
+
+### listar marcas con paginación inválida → 400
+GET {{base}}/api/admin/marcas?porPagina=101
+Authorization: Bearer {{tokenDueno}}
+
+### ver marcas → 200
+GET {{base}}/api/admin/marcas/{{marcaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### ver marcas con id inválido → 400
+GET {{base}}/api/admin/marcas/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### ver marcas inexistente → 404
+GET {{base}}/api/admin/marcas/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### editar marcas → 200
+PATCH {{base}}/api/admin/marcas/{{marcaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Marca de prueba editada"}
+
+### editar marcas con body inválido → 400
+PATCH {{base}}/api/admin/marcas/{{marcaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### editar marcas inexistente → 404
+PATCH {{base}}/api/admin/marcas/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Marca de prueba editada"}
+
+### desactivar marcas → 204
+DELETE {{base}}/api/admin/marcas/{{marcaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar marcas con id inválido → 400
+DELETE {{base}}/api/admin/marcas/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar marcas inexistente → 404
+DELETE {{base}}/api/admin/marcas/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### crear categorias → 201
+# @name crearCategoria
+POST {{base}}/api/admin/categorias
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Categoría de prueba","padreId":null}
+
+### crear categorias con body inválido → 400
+POST {{base}}/api/admin/categorias
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### listar categorias → 200
+GET {{base}}/api/admin/categorias?pagina=1&porPagina=24
+Authorization: Bearer {{tokenDueno}}
+
+### listar categorias con paginación inválida → 400
+GET {{base}}/api/admin/categorias?porPagina=101
+Authorization: Bearer {{tokenDueno}}
+
+### ver categorias → 200
+GET {{base}}/api/admin/categorias/{{categoriaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### ver categorias con id inválido → 400
+GET {{base}}/api/admin/categorias/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### ver categorias inexistente → 404
+GET {{base}}/api/admin/categorias/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### editar categorias → 200
+PATCH {{base}}/api/admin/categorias/{{categoriaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Categoría de prueba editada"}
+
+### editar categorias con body inválido → 400
+PATCH {{base}}/api/admin/categorias/{{categoriaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"campoDesconocido":true}
+
+### editar categorias inexistente → 404
+PATCH {{base}}/api/admin/categorias/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Categoría de prueba editada"}
+
+### desactivar categorias → 204
+DELETE {{base}}/api/admin/categorias/{{categoriaPruebaId}}
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar categorias con id inválido → 400
+DELETE {{base}}/api/admin/categorias/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### desactivar categorias inexistente → 404
+DELETE {{base}}/api/admin/categorias/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}
+
+### crear producto sin token → 401
+POST {{base}}/api/admin/productos
+Content-Type: application/json
+
+{"marcaId":"{{marcaId}}","nombre":"Sin token","metodologiaRotacion":"FIFO"}
+
+### crear producto con token de cliente → 403
+POST {{base}}/api/admin/productos
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{"marcaId":"{{marcaId}}","nombre":"Sin permiso","metodologiaRotacion":"FIFO"}
+
+### crear variante con código ya usado → 409
+POST {{base}}/api/admin/variantes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"productoId":"{{productoId}}","codigo":"VS-LOVE-236","nombre":"Duplicada","precioMinoristaCentavos":10000,"precioMayoristaCentavos":8000}
+
+### agregar imagen → 201
+# @name agregarImagen
+POST {{base}}/api/admin/variantes/{{varianteId}}/imagenes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"referenciaImagen":"https://example.com/imagen.jpg","orden":1}
+
+### agregar imagen con body inválido → 400
+POST {{base}}/api/admin/variantes/{{varianteId}}/imagenes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"referenciaImagen":""}
+
+### agregar imagen a variante inexistente → 404
+POST {{base}}/api/admin/variantes/{{inexistente}}/imagenes
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"referenciaImagen":"https://example.com/imagen.jpg"}
+
+### definir imagen principal → 204
+PUT {{base}}/api/admin/variantes/{{varianteId}}/imagen-principal
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"imagenId":"{{imagenId}}"}
+
+### definir imagen principal con body inválido → 400
+PUT {{base}}/api/admin/variantes/{{varianteId}}/imagen-principal
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"imagenId":"invalido"}
+
+### definir imagen principal inexistente → 404
+PUT {{base}}/api/admin/variantes/{{varianteId}}/imagen-principal
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"imagenId":"{{inexistente}}"}
+
+### quitar imagen → 204
+DELETE {{base}}/api/admin/imagenes/{{imagenId}}
+Authorization: Bearer {{tokenDueno}}
+
+### quitar imagen con id inválido → 400
+DELETE {{base}}/api/admin/imagenes/invalido
+Authorization: Bearer {{tokenDueno}}
+
+### quitar imagen inexistente → 404
+DELETE {{base}}/api/admin/imagenes/{{inexistente}}
+Authorization: Bearer {{tokenDueno}}

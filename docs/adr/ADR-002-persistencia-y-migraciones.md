@@ -19,3 +19,7 @@ Las migraciones vivirán en el backend, se ejecutarán de forma explícita desde
 - Las reglas de concurrencia se apoyarán además en restricciones e idioma SQL apropiado del motor elegido; el ORM no garantiza por sí solo la integridad de inventario.
 - Cada cambio de esquema requiere una migración nueva. Una migración aplicada no se edita retroactivamente.
 - La elección de motor y driver de base de datos sigue pendiente; `DATABASE_DSN` permite desacoplar la configuración, pero no define dialecto ni estrategia de despliegue.
+
+## Actualización — 2026-10-04
+
+Se resuelve el pendiente: el motor es PostgreSQL, con [`gorm.io/driver/postgres`](https://github.com/go-gorm/postgres) como dialecto. `postgresql.Abrir(dsn)` abre la conexión con `postgres.Open(dsn)`, configura el pool (`SetMaxOpenConns(10)`, `SetMaxIdleConns(5)`, `SetConnMaxLifetime(time.Hour)`) y verifica con `Ping`. El detalle de por qué Postgres y no otro motor relacional (integridad referencial fuerte para historial de pedidos e inventario, índices parciales para el dueño inicial único) se documenta junto a la decisión de despliegue en [ADR-005](ADR-005-despliegue.md).

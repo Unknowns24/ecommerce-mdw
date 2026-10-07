@@ -1,0 +1,20 @@
+# Secretos y entornos locales — nunca se commitean.
+/.env
+backend/.env
+docs/.env
+
+# Go
+backend/api
+backend/seed-*
+*.test
+*.out
+
+# Node / frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Editor / SO
+.DS_Store
+.idea/
+.vscode/

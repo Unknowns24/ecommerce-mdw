@@ -1,0 +1,10 @@
+/backend/internal/core/domain/identidad.go @yasruffinengo
+/backend/internal/adapters/rest/middleware/ @yasruffinengo
+/backend/internal/adapters/jwt/ @yasruffinengo
+/backend/internal/core/domain/catalogo.go @Unknowns24
+/backend/internal/core/domain/inventario.go @MainPyke17
+/backend/cmd/ @MainPyke17
+/backend/cmd/seed-catalogo/ @Unknowns24
+/backend/go.mod @MainPyke17
+/backend/internal/core/domain/pedidos.go @nicodiber
+/docs/specs.md @yasruffinengo @Unknowns24 @MainPyke17 @nicodiber

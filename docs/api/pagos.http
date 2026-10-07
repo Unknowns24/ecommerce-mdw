@@ -1,0 +1,68 @@
+@base = http://localhost:8080
+# Producción: descomentar después del merge y correr el archivo entero.
+# @base = https://api.tu-dominio.com
+
+###############################################
+# POST /api/pedidos/{id}/pago
+###############################################
+
+### iniciar pago de un pedido pendiente → 201 con initPoint
+POST {{base}}/api/pedidos/{{pedidoId}}/pago
+
+### pedido que no existe → 404
+POST {{base}}/api/pedidos/99999999-9999-9999-9999-999999999999/pago
+
+### pedido que ya no está pendiente de pago → 409
+POST {{base}}/api/pedidos/{{pedidoYaConfirmadoId}}/pago
+
+###############################################
+# POST /api/pagos/webhook — público a propósito
+###############################################
+
+### notificación sin firma válida → 401
+POST {{base}}/api/pagos/webhook?data.id=123456&type=payment
+Content-Type: application/json
+x-signature: ts=1700000000,v1=firma-invalida
+x-request-id: req-de-prueba
+
+{
+  "type": "payment",
+  "data": { "id": "123456" }
+}
+
+### notificación con firma válida → 200 (armar x-signature real con MERCADOPAGO_WEBHOOK_SECRET)
+POST {{base}}/api/pagos/webhook?data.id={{pagoId}}&type=payment
+Content-Type: application/json
+x-signature: ts={{ts}},v1={{firmaValida}}
+x-request-id: {{requestId}}
+
+{
+  "type": "payment",
+  "data": { "id": "{{pagoId}}" }
+}
+
+### la misma notificación otra vez → 200, el sistema queda igual (idempotente)
+POST {{base}}/api/pagos/webhook?data.id={{pagoId}}&type=payment
+Content-Type: application/json
+x-signature: ts={{ts}},v1={{firmaValida}}
+x-request-id: {{requestId}}
+
+{
+  "type": "payment",
+  "data": { "id": "{{pagoId}}" }
+}
+
+###############################################
+# GET /api/pedidos/{id}/pago
+###############################################
+
+### estado del último intento, con sesión → 200
+GET {{base}}/api/pedidos/{{pedidoId}}/pago
+Authorization: Bearer {{tokenCliente}}
+
+### sin token → 401
+GET {{base}}/api/pedidos/{{pedidoId}}/pago
+
+### pedido de otro comprador → 404
+GET {{base}}/api/pedidos/{{idDeUnPedidoAjeno}}/pago
+Authorization: Bearer {{tokenCliente}}

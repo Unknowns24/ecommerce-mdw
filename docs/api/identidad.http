@@ -1,0 +1,173 @@
+@base = http://localhost:8080
+# Producción: completar y descomentar tras desplegar la migración.
+# @base = https://api.tu-dominio.com
+# Cargar los valores de docs/.env con $dotenv; nunca versionar tokens reales.
+@inexistente = 99999999-9999-9999-9999-999999999999
+
+### bootstrap inicial → 201 (sólo una vez)
+POST {{base}}/api/auth/bootstrap
+Content-Type: application/json
+
+{"nombre":"Dueña","apellido":"Inicial","correo":"duena@example.com","contraseña":"clave-segura-123","clave_bootstrap":"{{claveBootstrap}}"}
+
+### bootstrap repetido → 409
+POST {{base}}/api/auth/bootstrap
+Content-Type: application/json
+
+{"nombre":"Otra","apellido":"Dueña","correo":"otra@example.com","contraseña":"clave-segura-123","clave_bootstrap":"{{claveBootstrap}}"}
+
+### bootstrap con body inválido → 400
+POST {{base}}/api/auth/bootstrap
+Content-Type: application/json
+
+{"nombre":""}
+
+### registro público → 201
+POST {{base}}/api/auth/registro
+Content-Type: application/json
+
+{"nombre":"Cliente","apellido":"Prueba","correo":"cliente@example.com","contraseña":"clave-segura-123","rol":"dueno"}
+
+### registro inválido → 400
+POST {{base}}/api/auth/registro
+Content-Type: application/json
+
+{"nombre":"Cliente","apellido":"Prueba","correo":"incorrecto","contraseña":"123"}
+
+### registro repetido → 409
+POST {{base}}/api/auth/registro
+Content-Type: application/json
+
+{"nombre":"Cliente","apellido":"Prueba","correo":"cliente@example.com","contraseña":"clave-segura-123"}
+
+### login de cliente → 200
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{"correo":"cliente@example.com","contraseña":"clave-segura-123"}
+
+### login inválido → 400
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{"correo":"correo-inválido","contraseña":""}
+
+### credenciales incorrectas → 401, mismo mensaje para correo inexistente
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{"correo":"nadie@example.com","contraseña":"clave-segura-123"}
+
+### cuenta propia → 200
+GET {{base}}/api/cuenta
+Authorization: Bearer {{tokenCliente}}
+
+### sin token → 401
+GET {{base}}/api/cuenta
+
+### modificar cuenta propia → 200
+PATCH {{base}}/api/cuenta
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{"nombre":"Cliente","apellido":"Actualizado","telefono":"1122334455"}
+
+### modificar cuenta con body inválido → 400
+PATCH {{base}}/api/cuenta
+Authorization: Bearer {{tokenCliente}}
+Content-Type: application/json
+
+{"nombre":""}
+
+### listar usuarios como dueño → 200
+GET {{base}}/api/admin/usuarios?limit=20&offset=0
+Authorization: Bearer {{tokenDueno}}
+
+### cliente listando usuarios → 403
+GET {{base}}/api/admin/usuarios
+Authorization: Bearer {{tokenCliente}}
+
+### sin token → 401
+GET {{base}}/api/admin/usuarios
+
+### crear cuenta administrativa → 201
+POST {{base}}/api/admin/usuarios
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"Operador","apellido":"Prueba","correo":"operador@example.com","contraseña":"clave-segura-123"}
+
+### crear cuenta administrativa con body inválido → 400
+POST {{base}}/api/admin/usuarios
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":""}
+
+### cambiar estado de cuenta administrativa → 200
+PATCH {{base}}/api/admin/usuarios/{{usuarioAdministrativoId}}/estado
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"estado":"INACTIVO"}
+
+### cambiar estado con body inválido → 400
+PATCH {{base}}/api/admin/usuarios/{{usuarioAdministrativoId}}/estado
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"estado":"BORRADO"}
+
+### cambiar estado de usuario inexistente → 404
+PATCH {{base}}/api/admin/usuarios/{{inexistente}}/estado
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"estado":"INACTIVO"}
+
+### listar roles y permisos → 200
+GET {{base}}/api/admin/roles
+Authorization: Bearer {{tokenDueno}}
+
+### crear rol → 201
+POST {{base}}/api/admin/roles
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"operador_catalogo","permisos":["catalogo.escribir"]}
+
+### crear rol con permiso inexistente → 400
+POST {{base}}/api/admin/roles
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nombre":"rol_invalido","permisos":["permiso.inexistente"]}
+
+### asignar roles → 200
+PUT {{base}}/api/admin/usuarios/{{usuarioAdministrativoId}}/roles
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"roles":["operador_catalogo"]}
+
+### asignar roles con body inválido → 400
+PUT {{base}}/api/admin/usuarios/{{usuarioAdministrativoId}}/roles
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"roles":[]}
+
+### asignar roles a usuario inexistente → 404
+PUT {{base}}/api/admin/usuarios/{{inexistente}}/roles
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"roles":["cliente"]}
+
+### cliente pidiendo pedido ajeno → 404 (requiere módulo de pedidos)
+GET {{base}}/api/pedidos/{{idDeUnPedidoAjeno}}
+Authorization: Bearer {{tokenCliente}}
+
+### cerrar sesión → 200
+POST {{base}}/api/auth/logout
+Authorization: Bearer {{tokenCliente}}
