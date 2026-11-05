@@ -18,9 +18,10 @@ Responsable del repositorio: Genaro (`Unknowns24`)
 | Clase 12 — formularios y mutaciones · *hito: flujo navegable desde la UI* | 27/10 | **No empezado**: el frontend es el template de `create-next-app` |
 | Clase 13 — testing y calidad, e2e en CI, `main` protegida | 03/11     | **No empezado**: el CI solo corre `go test`                   |
 | TP N° 1 (individual, Ultra)                               | **mar 10/11, 23:00** | Cada uno                                           |
-| Clase 14 — el sistema bajo carga                          | mar 10/11 | Se analiza cuando se publique                                  |
 | **Parcial II — defensa de la aplicación**                 | **mar 17/11** | Quedan 12 días                                             |
 | Demo Day / recuperatorios                                 | mar 24/11 | —                                                             |
+
+La clase 14 (el sistema bajo carga, 10/11) no suma trabajo al proyecto: el equipo decidió no incorporarla al desarrollo.
 
 **El último commit del repo es del 06/10.** Todo lo que piden las clases 10 a 13 está pendiente, y el Parcial II se defiende recorriendo el flujo principal desde la interfaz, con pruebas corriendo en CI.
 
@@ -163,7 +164,7 @@ El viernes 06/11, mientras Genaro deja lista la base del frontend, los otros tre
 | **vie 06/11**  | **Base del frontend mergeada**                 | Revisa el defecto 5; `/ingresar`        | Revisa el defecto 1; `pedidos.http` en producción | Revisa 2, 3 y 4; prueba en el sandbox de MP |
 | sáb 07 – dom 08 | Catálogo `/` y `/variantes/[id]`              | `/registro`, cookie de sesión           | `features/carrito`, `/carrito`            | Servicio `web` + Nginx en producción               |
 | lun 09/11      | Detalle con «Agregar»                          | Layouts `(cuenta)` y `(admin)`, barra   | `/checkout` (retiro y efectivo)           | Job del frontend en el CI                          |
-| **mar 10/11** — clase 14 · **TP N° 1** | Revisión del TP de cada uno; nadie mergea nada grande ese día | | | |
+| **mar 10/11** — **TP N° 1** | Revisión del TP de cada uno; nadie mergea nada grande ese día | | | |
 | mié 11/11      | `/admin/productos` y `[id]`                    | `/cuenta`, `/admin`, `/admin/usuarios`  | Checkout con envío y Mercado Pago, `/pago/retorno` | `/admin/pedidos` y `[id]` con transiciones  |
 | jue 12/11      | Marcas, categorías, `/admin/sistema`           | `/admin/roles`, `e2e/sesiones.ts`       | `/seguimiento/[token]`, `/cuenta/pedidos` | Stock y proveedores; harness de Playwright         |
 | **vie 13/11**  | **Ruleset de `main`**; pruebas de catálogo     | `e2e/permisos.spec.ts` completo         | Pantallas del flujo mergeadas             | **Jobs de frontend y e2e en el CI**                |
@@ -195,4 +196,3 @@ Cada uno revisa el PR de otro todos los días. Rotando así, en tres días todos
 | 2 | Aceptar ADR-007 (cómo el frontend consume la API y el despliegue bajo el mismo dominio)       | los cuatro   | vie 06/11   |
 | 3 | Qué pasa con el carrito del invitado al iniciar sesión: se descarta o se conserva sin mezclar | Nicolás      | lun 09/11   |
 | 4 | Cómo prueba el e2e el paso de Mercado Pago (propuesta en ADR-007, «Pendiente»)               | Agustín      | jue 12/11   |
-| 5 | Qué pide la clase 14 (el sistema bajo carga) sobre nuestro checkout y nuestras reservas       | los cuatro   | mar 10/11   |
