@@ -3,6 +3,7 @@ package pagos
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -14,6 +15,7 @@ import (
 	apierr "github.com/Unknowns24/ecommerce-mdw/internal/adapters/rest/errors"
 	"github.com/Unknowns24/ecommerce-mdw/internal/core/domain"
 	usecases "github.com/Unknowns24/ecommerce-mdw/internal/usecases/inventario"
+	reglas "github.com/Unknowns24/ecommerce-mdw/internal/usecases/pagos"
 )
 
 const endpointWebhook = "POST /api/pagos/webhook"
@@ -80,9 +82,14 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 // idempotente: una notificación repetida del mismo pago no duplica ni el
 // movimiento de stock ni la confirmación del pedido.
 //   - approved: si ya hay un intento APROBADO para esta referencia, no hace
-//     nada; si no, confirma el intento, descuenta stock (ServicioStock.Confirmar
-//     ya es idempotente por su cuenta) y confirma el pedido.
+//     nada; si no, registra el intento y, solo si el pedido todavía espera el
+//     pago y lo acreditado es exactamente su total, descuenta stock
+//     (ServicioStock.Confirmar ya es idempotente por su cuenta) y confirma el
+//     pedido. Si no, deja la incidencia en el log para la administración.
 //   - cualquier otro estado: sólo deja registrado el intento con su estado.
+//
+// El pedido se lee con FOR UPDATE dentro de la transacción: el vencimiento
+// automático no puede cancelarlo mientras se decide su confirmación.
 func procesarNotificacion(ctx context.Context, db *gorm.DB, stock *usecases.ServicioStock, intentos *repo.RepositorioIntentos, pedidoID uuid.UUID, pago mp.Pago) error {
 	estado := estadoIntentoDesdeMercadoPago(pago.Estado)
 
@@ -95,6 +102,14 @@ func procesarNotificacion(ctx context.Context, db *gorm.DB, stock *usecases.Serv
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
+		pedido, existe, err := pedidoPorID(ctx, tx, pedidoID, true)
+		if err != nil {
+			return err
+		}
+		if !existe {
+			return fmt.Errorf("el pago %s referencia un pedido inexistente %s", pago.ID, pedidoID)
+		}
+
 		intentosTx := repo.NuevoRepositorioIntentos(tx)
 
 		if encontrado {
@@ -116,6 +131,17 @@ func procesarNotificacion(ctx context.Context, db *gorm.DB, stock *usecases.Serv
 		}
 
 		if estado != domain.IntentoAprobado {
+			return nil
+		}
+
+		switch reglas.DecidirConfirmacion(pedido, pago.MontoCentavos) {
+		case reglas.NoConfirmarPedidoNoPendiente:
+			log.Printf("%s: INCIDENCIA pago %s aprobado para el pedido %s en estado %s: no se confirma, revisar stock y reintegro",
+				endpointWebhook, pago.ID, pedidoID, pedido.EstadoPedido)
+			return nil
+		case reglas.NoConfirmarMontoDistinto:
+			log.Printf("%s: INCIDENCIA pago %s acreditó %d centavos y el pedido %s suma %d: no se confirma",
+				endpointWebhook, pago.ID, pago.MontoCentavos, pedidoID, pedido.TotalCentavos)
 			return nil
 		}
 

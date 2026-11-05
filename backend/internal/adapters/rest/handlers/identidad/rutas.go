@@ -162,12 +162,13 @@ func usuarioID(r *http.Request) uuid.UUID {
 	return u.ID
 }
 func (h *handler) cuenta(w http.ResponseWriter, r *http.Request) {
-	u, err := h.servicio.Cuenta(r.Context(), usuarioID(r))
+	sesion, _ := middleware.UsuarioDeContexto(r.Context())
+	u, err := h.servicio.Cuenta(r.Context(), sesion.ID)
 	if err != nil {
 		responder(w, r, err)
 		return
 	}
-	apierr.JSON(w, 200, u)
+	apierr.JSON(w, 200, dto.NuevaCuenta(u, sesion.Roles, sesion.Permisos))
 }
 func (h *handler) actualizarCuenta(w http.ResponseWriter, r *http.Request) {
 	var b dto.Cuenta
