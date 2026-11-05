@@ -48,7 +48,7 @@ La clase 14 (el sistema bajo carga, 10/11) no suma trabajo al proyecto: el equip
 
 ### Defectos encontrados en lo que ya está hecho
 
-Ordenados por gravedad. Los defectos 1 a 5 **se corrigieron el 05/11, con sus pruebas** (detalle en `docs/api.md`, sección «Diferencias»): quedan para que su dueño los revise y los pueda defender, porque en la defensa le van a preguntar a él por su módulo. Los 6 a 8 siguen abiertos.
+Ordenados por gravedad. Los defectos 1 a 5 **se corrigieron el 05/11, con sus pruebas** (detalle en `docs/api.md`, sección «Diferencias»), y los 6 a 8 se corrigieron en el mismo PR: las pruebas de catálogo, el README y ADR-005 alineados con el workflow, y el merge de `docs/diagrams`. Quedan para que su dueño los revise y los pueda defender, porque en la defensa le van a preguntar a él por su módulo.
 
 | # | Defecto                                                                                                    | Dónde                                                     | Dueño    |
 | - | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------- |
@@ -57,9 +57,9 @@ Ordenados por gravedad. Los defectos 1 a 5 **se corrigieron el 05/11, con sus pr
 | 3 | `POST /api/pedidos/{id}/pago` no verifica quién paga, ni el vencimiento de la reserva, ni si ya hay un intento activo (H14) | `handlers/pagos/iniciar.go`                               | Agustín · **corregido** |
 | 4 | No hay vencimiento automático de los pedidos de Mercado Pago a los 15 minutos: una reserva abandonada bloquea stock para siempre (H14) | `handlers/pagos/vencimiento.go`                           | Agustín · **corregido** |
 | 5 | `GET /api/cuenta` no devuelve roles ni permisos (la barra los necesita)                                     | `handlers/identidad/rutas.go`                             | Yasmín · **corregido** |
-| 6 | Sin pruebas de dominio en catálogo (`usecases/catalogo` no tiene `_test.go`)                               | `backend/internal/usecases/catalogo/`                     | Genaro   |
-| 7 | Documentación desactualizada: el README menciona `deploy/nginx/` (no existe) y un CD por SSH que el workflow ya no hace; ADR-005 describe ese mismo job | `readme.md`, `docs/adr/ADR-005-despliegue.md`             | Agustín  |
-| 8 | La rama `docs/diagrams` (diagrama entidad-relación) no está mergeada                                       | rama `docs/diagrams`                                      | Genaro   |
+| 6 | Sin pruebas de dominio en catálogo (`usecases/catalogo` no tiene `_test.go`)                               | `backend/internal/usecases/catalogo/`                     | Genaro · **corregido** |
+| 7 | Documentación desactualizada: el README menciona `deploy/nginx/` (no existe) y un CD por SSH que el workflow ya no hace; ADR-005 describe ese mismo job | `readme.md`, `docs/adr/ADR-005-despliegue.md`             | Agustín · **corregido** |
+| 8 | La rama `docs/diagrams` (diagrama entidad-relación) no está mergeada                                       | rama `docs/diagrams`                                      | Genaro · **corregido** |
 
 ### Una alerta sobre la nota individual
 
