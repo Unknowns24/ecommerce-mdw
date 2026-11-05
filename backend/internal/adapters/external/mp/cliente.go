@@ -10,14 +10,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	apierr "github.com/Unknowns24/ecommerce-mdw/internal/adapters/rest/errors"
 )
 
 const (
-	urlPreferencias = "https://api.mercadopago.com/checkout/preferences"
-	urlPagos        = "https://api.mercadopago.com/v1/payments/"
+	urlPreferencias  = "https://api.mercadopago.com/checkout/preferences"
+	urlPagos         = "https://api.mercadopago.com/v1/payments/"
+	urlBusquedaPagos = "https://api.mercadopago.com/v1/payments/search"
 )
 
 // Cliente talks to the Mercado Pago sandbox/production API with a 10 second
@@ -148,6 +150,29 @@ func (c *Cliente) ObtenerPago(ctx context.Context, pagoID string) (Pago, error) 
 		MontoCentavos:     int64(respuesta.TransactionAmount*100 + 0.5),
 		ReferenciaExterna: respuesta.ExternalReference,
 	}, nil
+}
+
+type busquedaPagosResponse struct {
+	Results []struct {
+		Status string `json:"status"`
+	} `json:"results"`
+}
+
+// EstadosDePagosDelPedido devuelve el estado de cada pago que Mercado Pago
+// tiene asociado al pedido (external_reference). Es la fuente de verdad para
+// saber si ya hay un cobro en curso: el webhook puede llegar tarde o no
+// llegar, así que la tabla local no alcanza.
+func (c *Cliente) EstadosDePagosDelPedido(ctx context.Context, pedidoID string) ([]string, error) {
+	var respuesta busquedaPagosResponse
+	direccion := urlBusquedaPagos + "?external_reference=" + url.QueryEscape(pedidoID)
+	if err := c.solicitar(ctx, http.MethodGet, direccion, nil, &respuesta); err != nil {
+		return nil, err
+	}
+	estados := make([]string, len(respuesta.Results))
+	for i, r := range respuesta.Results {
+		estados[i] = r.Status
+	}
+	return estados, nil
 }
 
 func (c *Cliente) solicitar(ctx context.Context, metodo, url string, cuerpo any, destino any) error {

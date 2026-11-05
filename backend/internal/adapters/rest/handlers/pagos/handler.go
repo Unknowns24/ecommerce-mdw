@@ -4,14 +4,17 @@ package pagos
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/Unknowns24/ecommerce-mdw/config"
 	repo "github.com/Unknowns24/ecommerce-mdw/internal/adapters/db/postgresql/repositories/pagos"
 	"github.com/Unknowns24/ecommerce-mdw/internal/adapters/external/mp"
+	"github.com/Unknowns24/ecommerce-mdw/internal/core/domain"
 	usecases "github.com/Unknowns24/ecommerce-mdw/internal/usecases/inventario"
 )
 
@@ -33,29 +36,26 @@ func nuevoHandler(db *gorm.DB, cfg config.Config) *handler {
 	}
 }
 
-// pedidoParaPago es lo mínimo del pedido (módulo de Nicolás) que este
-// módulo necesita para abrir una preferencia: no hay un lector congelado
-// para pedidos todavía, así que se consulta la tabla directamente, igual
-// que inventario hace con variante y producto.
-type pedidoParaPago struct {
-	ID            uuid.UUID
-	EstadoPago    string
-	MedioPago     string
-	TotalCentavos int64
-}
-
-func pedidoPorID(ctx context.Context, db *gorm.DB, id uuid.UUID) (pedidoParaPago, bool, error) {
-	var p pedidoParaPago
-	err := db.WithContext(ctx).
-		Table("pedido").
-		Select("id, estado_pago, medio_pago, total_centavos").
-		Where("id = ?", id).
-		Scan(&p).Error
-	if err != nil {
-		return pedidoParaPago{}, false, err
+// pedidoPorID lee del pedido (módulo de Nicolás) solo las columnas que las
+// reglas de pago necesitan: no hay un lector congelado para pedidos, así que
+// se consulta la tabla directamente, igual que inventario hace con variante y
+// producto. Con bloquear, toma la fila con FOR UPDATE: el webhook y el
+// vencimiento automático no pueden decidir los dos sobre el mismo pedido a la
+// vez.
+func pedidoPorID(ctx context.Context, db *gorm.DB, id uuid.UUID, bloquear bool) (domain.Pedido, bool, error) {
+	var p domain.Pedido
+	consulta := db.WithContext(ctx).
+		Select("id, usuario_id, estado_pedido, estado_pago, medio_pago, envio_centavos, total_centavos, token_acceso, vence_en").
+		Where("id = ?", id)
+	if bloquear {
+		consulta = consulta.Clauses(clause.Locking{Strength: "UPDATE"})
 	}
-	if p.ID == uuid.Nil {
-		return pedidoParaPago{}, false, nil
+	err := consulta.Take(&p).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domain.Pedido{}, false, nil
+	}
+	if err != nil {
+		return domain.Pedido{}, false, err
 	}
 	return p, true, nil
 }
@@ -78,12 +78,13 @@ func lineasDePedido(ctx context.Context, db *gorm.DB, pedidoID uuid.UUID) ([]lin
 }
 
 // confirmarPedido marca el pedido como CONFIRMADO con pago APROBADO. Es
-// idempotente: el WHERE excluye los pedidos que ya están aprobados, así que
-// una segunda notificación no pisa nada ni dispara un UPDATE de más.
+// idempotente: el WHERE solo toma pedidos que todavía esperan el pago, así que
+// una segunda notificación no pisa nada, y un pedido vencido o cancelado
+// nunca vuelve a confirmarse por este camino.
 func confirmarPedido(ctx context.Context, tx *gorm.DB, pedidoID uuid.UUID) error {
 	return tx.WithContext(ctx).Exec(
 		`UPDATE pedido SET estado_pedido = 'CONFIRMADO', estado_pago = 'APROBADO', actualizado_en = ?
-		 WHERE id = ? AND estado_pago <> 'APROBADO'`,
+		 WHERE id = ? AND estado_pedido = 'PENDIENTE_DE_PAGO' AND estado_pago <> 'APROBADO'`,
 		time.Now(), pedidoID,
 	).Error
 }
