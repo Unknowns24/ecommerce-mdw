@@ -50,10 +50,10 @@ frontend/         tienda y panel en Next.js
 
 ## Producción
 
-**URL pública:** _pendiente — todavía no hay despliegue real en una VPS._ Cuando exista, va acá y no cambia en todo el cuatrimestre (ver [ADR-005](docs/adr/ADR-005-despliegue.md)). Hasta entonces, `docs/api/*.http` sólo corre contra `http://localhost:8080`.
+**URL pública:** https://mdw.unkcode.com
 
 ```bash
-curl https://<la-url-pública>/api/salud
+curl https://mdw.unkcode.com/api/salud
 # {"estado":"ok","version":"<git-sha-corto>"}
 ```
 
