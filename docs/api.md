@@ -78,6 +78,7 @@ Una variante inactiva no aparece en `/api/catalogo/variantes` y `/api/catalogo/v
 
 | Método        | Ruta                                          | Quién puede                    | Sin sesión | Sin permiso | Ajeno | Historia |
 | ------------- | --------------------------------------------- | ------------------------------ | ---------- | ----------- | ----- | -------- |
+| GET           | `/api/tienda/configuracion`                   | público                        | —          | —           | —     | H13      |
 | GET, DELETE   | `/api/carrito`                                | sesión                         | 401        | —           | —     | H07      |
 | POST          | `/api/carrito/items`                          | sesión                         | 401        | —           | —     | H07      |
 | PATCH, DELETE | `/api/carrito/items/{id}`                     | sesión                         | 401        | —           | 404   | H07      |
@@ -91,6 +92,8 @@ Una variante inactiva no aparece en `/api/catalogo/variantes` y `/api/catalogo/v
 | POST          | `/api/admin/pedidos/{id}/entrega`             | `pedidos.gestionar`            | 401        | 403         | —     | H17      |
 | POST          | `/api/admin/pedidos/{id}/cobro-efectivo`      | `pedidos.gestionar`            | 401        | 403         | —     | H15, H17 |
 | POST          | `/api/admin/pedidos/{id}/cancelacion`         | `pedidos.gestionar`            | 401        | 403         | —     | H18      |
+
+`GET /api/tienda/configuracion` **todavía no existe** (lo agrega Nicolás, `docs/tareas/nicolas.md`): devuelve `efectivoHabilitado`, `distanciaMaximaMetros` y las tarifas `{desdeMetros, hastaMetros, costoCentavos}`, para que el checkout ofrezca efectivo solo si está habilitado y anticipe el costo de envío (H13). El costo que vale es el que calcula `POST /api/pedidos`.
 
 En `POST /api/pedidos`, la identidad sale de la sesión si la hay y el precio sale del catálogo, nunca del cuerpo: un cuerpo que mande precio o usuario no cambia el resultado.
 

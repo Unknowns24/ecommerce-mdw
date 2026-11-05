@@ -71,24 +71,12 @@ Los commits del repo se concentran en cuatro días (12/09, 18/09, 04/10 y 06/10)
 
 Se mantiene el reparto por **módulo de dominio, de punta a punta**: cada uno es dueño del backend y de las pantallas de su módulo. Lo que hace posible trabajar sin esperarse ya está escrito:
 
-1. **Las direcciones de las pantallas están congeladas** en el mapa de pantallas (spec, sección 5). Nadie necesita preguntarle a otro a dónde enlazar.
+1. **Las direcciones de las pantallas están congeladas** en el mapa de pantallas (spec, sección 5). Para enlazar a una pantalla de otro alcanza con su dirección.
 2. **El contrato de la API está congelado** en `docs/api.md` y `docs/api/*.http`. Cada pantalla consume endpoints que ya existen.
-3. **La forma de consumir la API está fijada** en ADR-007: un cliente compartido (`src/lib/api.ts`) y un `src/features/<modulo>/api.ts` por módulo.
+3. **El contrato del frontend está congelado** en [`docs/contratos-frontend.md`](contratos-frontend.md): quién es dueño de cada carpeta, las firmas de las piezas compartidas y los cuatro puntos de encuentro entre módulos, que nacen como *stub* en la base del día 0.
 4. **Las pruebas se escriben desde la spec y el contrato**, no desde el código del compañero: se pueden escribir en paralelo.
 
-### Archivos compartidos del frontend y su regla
-
-| Archivo / zona                                   | Dueño   | Regla para los demás                                                       |
-| ------------------------------------------------ | ------- | -------------------------------------------------------------------------- |
-| `src/components/ui/`, `src/app/globals.css`, `components.json` | Genaro | Solo lectura. Un componente base nuevo se pide por Issue                  |
-| `src/lib/api.ts`, `src/lib/formato.ts`, `src/components/campo.tsx`, `src/components/sin-datos.tsx` | Genaro | Solo lectura |
-| `src/app/layout.tsx`, `src/app/(tienda)/layout.tsx` | Genaro | Solo lectura                                                                |
-| `src/app/(admin)/layout.tsx`, `src/app/(cuenta)/layout.tsx`, barra del panel | Yasmín | Solo lectura. Los módulos del panel salen del mapa de pantallas            |
-| `src/features/<modulo>/` y las rutas del mapa de su módulo | el dueño del módulo | No se edita una ajena                                       |
-| `frontend/package.json`                          | quien agrega la dependencia | Commit aparte, avisando en el grupo. Nunca en el commit de la feature |
-| `playwright.config.ts`, `e2e/preparar.ts`, workflows de CI, `docker-compose.yml` | Agustín | Solo lectura                                                  |
-| `e2e/sesiones.ts`, `e2e/permisos.spec.ts`        | Yasmín  | Un endpoint nuevo se agrega con su fila: quien crea el endpoint le pasa la fila |
-| `e2e/flujo-principal.spec.ts`                    | Nicolás | —                                                                           |
+La única espera del equipo es la base del frontend (Genaro, viernes 06/11). Mientras tanto, los otros tres tienen trabajo que no la necesita.
 
 ### Git
 
@@ -99,76 +87,32 @@ Se mantiene el reparto por **módulo de dominio, de punta a punta**: cada uno es
 
 ---
 
-## 3. Los cuatro paquetes
+## 3. Las tareas de cada uno
 
-El viernes 06/11, mientras Genaro deja lista la base del frontend, los otros tres revisan el arreglo de backend de su módulo (defectos 1 a 5, ya corregidos): lo leen línea por línea, lo prueban contra producción y lo aprueban en el PR. «Ship it, but own it»: lo que el dueño no pueda explicar no cuenta en la defensa.
+Cada integrante tiene su archivo en [`docs/tareas/`](tareas/README.md), con qué es suyo, qué consume, sus tareas en orden y cuándo cada una está terminada. Se puede pasar tal cual al asistente de IA.
 
-### Genaro — Catálogo y sistema visual
+| Integrante | Archivo                                   | Antes de la base (vie 06/11)                                   | Después                                                                  |
+| ---------- | ----------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Genaro     | [genaro.md](tareas/genaro.md)             | **La base del frontend**                                       | Catálogo, detalle, productos, marcas, categorías, `/admin/sistema`, ruleset |
+| Yasmín     | [yasmin.md](tareas/yasmin.md)             | Revisa el defecto 5; harness de Playwright, sesiones y pruebas de permisos | Ingresar, registro, cuenta, layout del panel, usuarios y roles   |
+| Nicolás    | [nicolas.md](tareas/nicolas.md)           | Revisa el defecto 1; `GET /api/tienda/configuracion`; lógica del carrito | Carrito, checkout, retorno de pago, consulta de pedidos, e2e del flujo |
+| Agustín    | [agustin.md](tareas/agustin.md)           | Revisa 2, 3 y 4 y los prueba en el sandbox; frontend en producción | CI del frontend y e2e, pedidos del panel, stock y proveedores         |
 
-**Día 0 (vie 06/11), y es lo único que los demás esperan:** PR de la base del frontend, mergeado ese mismo día.
-- Tailwind + `npx shadcn@latest init` y `add button card badge input label skeleton alert separator table select textarea`. Ese commit solo, sin pantallas.
-- Tokens en `globals.css` con contraste 4,5:1.
-- `src/lib/api.ts` (ADR-007), `src/lib/formato.ts` (centavos → pesos), `src/components/campo.tsx`, `src/components/sin-datos.tsx`.
-- Los tres grupos de ruta con su layout mínimo, y el script `typecheck` en `package.json`.
-
-**Después:**
-- `(tienda)/layout.tsx`: encabezado con nombre, búsqueda, link al carrito e «Ingresar» o el nombre de quien tiene sesión.
-- `/` catálogo: búsqueda, filtros por categoría y marca, orden por precio, paginación; los cinco estados, «SIN STOCK» visible (H04).
-- `/variantes/[id]`: detalle, imágenes con alternativa si fallan, otras variantes, «Agregar al carrito» (el botón llama a la función que expone Nicolás en `features/carrito/`) (H05).
-- `/admin/productos`, `/admin/productos/[id]` (variantes e imágenes), `/admin/marcas`, `/admin/categorias` (H08).
-- `/admin/sistema`: la galería.
-- Backend: pruebas de dominio de catálogo (defecto 6). Mergear `docs/diagrams` (defecto 8).
-- Como responsable del repo: ruleset de `main` (viernes 13/11).
-
-### Yasmín — Identidad, panel y pruebas de permisos
-
-**Día 0:** revisar el defecto 5 (`GET /api/cuenta` con roles y permisos de la sesión, `dtos/identidad/cuenta.go`) y arrancar `/ingresar`.
-
-**Después:**
-- `/ingresar` y `/registro` con Server Actions; la cookie de sesión según ADR-007; «Salir».
-- `/cuenta`: datos y edición (H02).
-- `(cuenta)/layout.tsx` y `(admin)/layout.tsx`: redirección sin sesión y barra del panel con nombre, roles, los módulos que habilitan los permisos y «Salir».
-- `/admin` (inicio del panel), `/admin/usuarios`, `/admin/roles` (H03).
-- `e2e/sesiones.ts`: fabrica el JWT con el `APP_SECRET_KEY` de prueba para cada cuenta de prueba de `docs/api.md`.
-- `e2e/permisos.spec.ts`: **una prueba por fila de `docs/api.md`**, escrita desde el contrato. Las filas de carrito y pedidos van a fallar hasta que se arregle el defecto 1: eso es lo esperado. Ver una fallar a propósito y contarlo en el PR.
-
-### Nicolás — Carrito, checkout, consulta y flujo de punta a punta
-
-**Día 0:** revisar el defecto 1 (las rutas de pedidos montadas en `handlers/pedidos/rutas.go`, con los dos adaptadores hacia catálogo e inventario). Después del deploy, correr `docs/api/pedidos.http` entero contra producción.
-
-**Después:**
-- `src/features/carrito/`: el carrito del invitado en `localStorage` y el del cliente contra la API, detrás de las mismas funciones (las usa el botón del detalle de Genaro).
-- `/carrito` (H07).
-- `/checkout`: datos del comprador, retiro o envío, medio de pago, resumen y confirmación; el 409 de stock enumera variante → disponibles arriba del formulario (H13, H15). Con Mercado Pago, inicia el pago y redirige al `init_point`.
-- `/pago/retorno`: nunca muestra «pagado» por el parámetro; lleva al detalle del pedido (H14).
-- `/seguimiento/[token]` con su propio 404, `/cuenta/pedidos`, `/cuenta/pedidos/[id]` (H16).
-- `e2e/flujo-principal.spec.ts`: un `test.step` por fila del mapa, con el caso de error de stock en el medio (sábado 14/11, cuando todas las pantallas del flujo estén mergeadas).
-
-### Agustín — Pagos, stock, back-office e infraestructura
-
-**Día 0:** revisar los defectos 2, 3 y 4 (`usecases/pagos/reglas.go`, `handlers/pagos/iniciar.go`, `webhook.go` y `vencimiento.go`) y probar en el sandbox de Mercado Pago lo que acá no se pudo: una compra con envío de punta a punta, y que la búsqueda de pagos por `external_reference` responda con el token de producción. Después, arrancar la infraestructura.
-
-**Después:**
-- `/admin/pedidos` con filtros por fecha y estado, y `/admin/pedidos/[id]` con despacho, entrega, «Completar pedido» en efectivo y cancelación con motivo y confirmación explícita del reintegro (H17, H18, H15).
-- `/admin/proveedores`, `/admin/stock/[varianteId]` (lotes, movimientos y ajuste), `/admin/stock/lotes/nuevo` (H09).
-- Infraestructura: servicio `web` en `docker-compose.yml`, regla de Nginx `/api/` → API y el resto → Next (ADR-007), imagen del frontend en el workflow.
-- CI: job del frontend (`lint`, `typecheck`, `build`) y job `e2e` (Postgres como servicio, migraciones, seed, API, `next build && next start`, Playwright), con `playwright.config.ts` que se niega a correr contra una base no local y `e2e/preparar.ts` que siembra los datos de la demo.
-- Defecto 7: README y ADR-005 al día.
-
----
+Los defectos 6, 7 y 8 de la sección 1 se resuelven en el mismo PR que trae este plan.
 
 ## 4. Calendario hasta el Parcial II
 
-| Día            | Genaro                                         | Yasmín                                  | Nicolás                                   | Agustín                                            |
-| -------------- | ---------------------------------------------- | --------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| **vie 06/11**  | **Base del frontend mergeada**                 | Revisa el defecto 5; `/ingresar`        | Revisa el defecto 1; `pedidos.http` en producción | Revisa 2, 3 y 4; prueba en el sandbox de MP |
-| sáb 07 – dom 08 | Catálogo `/` y `/variantes/[id]`              | `/registro`, cookie de sesión           | `features/carrito`, `/carrito`            | Servicio `web` + Nginx en producción               |
-| lun 09/11      | Detalle con «Agregar»                          | Layouts `(cuenta)` y `(admin)`, barra   | `/checkout` (retiro y efectivo)           | Job del frontend en el CI                          |
-| **mar 10/11** — **TP N° 1** | Revisión del TP de cada uno; nadie mergea nada grande ese día | | | |
-| mié 11/11      | `/admin/productos` y `[id]`                    | `/cuenta`, `/admin`, `/admin/usuarios`  | Checkout con envío y Mercado Pago, `/pago/retorno` | `/admin/pedidos` y `[id]` con transiciones  |
-| jue 12/11      | Marcas, categorías, `/admin/sistema`           | `/admin/roles`, `e2e/sesiones.ts`       | `/seguimiento/[token]`, `/cuenta/pedidos` | Stock y proveedores; harness de Playwright         |
-| **vie 13/11**  | **Ruleset de `main`**; pruebas de catálogo     | `e2e/permisos.spec.ts` completo         | Pantallas del flujo mergeadas             | **Jobs de frontend y e2e en el CI**                |
-| sáb 14/11      | Recorrido con teclado y 375px de todo el panel | Visto fallar a propósito, en el PR      | `e2e/flujo-principal.spec.ts` en verde    | Recorrido en teléfono real del checkout            |
+| Día            | Genaro                              | Yasmín                                   | Nicolás                                     | Agustín                                       |
+| -------------- | ----------------------------------- | ---------------------------------------- | ------------------------------------------- | --------------------------------------------- |
+| **vie 06/11**  | **G0 — base mergeada**              | Y0 revisión · Y1 harness                 | N0 revisión · N1 configuración · N2 carrito | A0 revisión y sandbox · A1                    |
+| sáb 07/11      | G1 encabezado · G2 catálogo         | Y1 harness · Y2 sesiones                 | N2 carrito                                  | A2 frontend en producción                     |
+| dom 08/11      | G2 catálogo                         | Y3 permisos                              | N3 `/carrito`                               | A2 frontend en producción                     |
+| lun 09/11      | G3 detalle                          | Y3 permisos                              | N4 checkout                                 | A3 job `Verificar frontend`                   |
+| **mar 10/11** — **TP N° 1** | — | Y4 ingresar y registro                 | N4 checkout                                 | A4 pedidos del panel                          |
+| mié 11/11      | G4 productos                        | Y5 cuenta · Y6 layout del panel          | N4 checkout · N5 retorno                    | A4 · A5 transiciones                          |
+| jue 12/11      | G5 marcas y categorías · G6 galería | Y7 usuarios y roles                      | N6 consulta de pedidos                      | A5 · A6 stock y proveedores                   |
+| **vie 13/11**  | **G7 ruleset de `main`**            | Pruebas de permisos al día               | N7 e2e del flujo                            | **A3 job `e2e` en verde** · A6                |
+| sáb 14/11      | G8 recorrido                        | Y8 recorrido                             | N7 e2e del flujo en verde                   | A7 checkout en un teléfono real               |
 | dom 15/11      | **Congelamiento: desde acá solo arreglos.** Ensayo: cada uno explica el módulo de otro | | | |
 | lun 16/11      | Datos de la demo cargados en producción; correr el flujo en producción una vez | | | |
 | **mar 17/11**  | **PARCIAL II** — los cuatro, 10 minutos recorriendo el flujo desde la UI | | | |

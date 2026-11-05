@@ -27,7 +27,7 @@ Las decisiones aceptadas se mantienen como ADR:
 - [ADR-006: login propio y JWT con permisos adentro](docs/adr/ADR-006-sesion.md)
 - [ADR-007 (propuesto): frontend en Next.js que consume la API desde el servidor](docs/adr/ADR-007-frontend-y-consumo-de-la-api.md)
 
-Quién puede llamar a cada endpoint está en [el contrato de la API](docs/api.md); las reglas para escribir código (y para el asistente de IA), en [`AGENTS.md`](AGENTS.md); el reparto del trabajo hasta el Parcial II, en [el plan de trabajo](docs/plan-de-trabajo.md).
+Quién puede llamar a cada endpoint está en [el contrato de la API](docs/api.md); las reglas para escribir código (y para el asistente de IA), en [`AGENTS.md`](AGENTS.md); el reparto del trabajo hasta el Parcial II, en [el plan de trabajo](docs/plan-de-trabajo.md), con las tareas de cada integrante en [`docs/tareas/`](docs/tareas/README.md) y el contrato que les permite trabajar en paralelo en [`docs/contratos-frontend.md`](docs/contratos-frontend.md).
 
 Las propuestas futuras y asuntos abiertos están separados como [RFC](docs/rfc/README.md). Un RFC no habilita código productivo hasta contar con una decisión aceptada.
 
