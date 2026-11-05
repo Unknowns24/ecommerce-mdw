@@ -20,7 +20,7 @@ El stack sugerido por la materia es un único proyecto Next.js donde las pantall
 
 Ningún Client Component hace `fetch` a la API.
 
-**La sesión.** La Server Action de ingreso llama a `POST /api/auth/login`, toma el token de la respuesta y escribe la cookie `sesion` en la respuesta de Next con los mismos atributos que usa el backend (`HttpOnly`, `Secure` en producción, `SameSite=Lax`, 24 h). Salir llama a `POST /api/auth/logout` y borra la cookie. Los roles y permisos que se muestran (el rol en la barra, qué módulos ve cada uno en el panel) salen de `GET /api/cuenta`: el frontend nunca decodifica el JWT para decidir nada. Hoy esa respuesta no los incluye; agregarlos es requisito de esta decisión (ver `docs/api.md`, «Diferencias»).
+**La sesión.** La Server Action de ingreso llama a `POST /api/auth/login`, toma el token de la respuesta y escribe la cookie `sesion` en la respuesta de Next con los mismos atributos que usa el backend (`HttpOnly`, `Secure` en producción, `SameSite=Lax`, 24 h). Salir llama a `POST /api/auth/logout` y borra la cookie. Los roles y permisos que se muestran (el rol en la barra, qué módulos ve cada uno en el panel) salen de `GET /api/cuenta`: el frontend nunca decodifica el JWT para decidir nada. Son los de la sesión, no los de la base (ADR-006): el panel no ofrece algo que el token todavía no permite.
 
 **La validación.** La del backend es la única. El frontend no replica las reglas en Zod: una Server Action traduce la respuesta:
 

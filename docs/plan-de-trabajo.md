@@ -47,15 +47,15 @@ Responsable del repositorio: Genaro (`Unknowns24`)
 
 ### Defectos encontrados en lo que ya está hecho
 
-Ordenados por gravedad. El detalle está en `docs/api.md`, sección «Diferencias».
+Ordenados por gravedad. Los defectos 1 a 5 **se corrigieron el 05/11, con sus pruebas** (detalle en `docs/api.md`, sección «Diferencias»): quedan para que su dueño los revise y los pueda defender, porque en la defensa le van a preguntar a él por su módulo. Los 6 a 8 siguen abiertos.
 
 | # | Defecto                                                                                                    | Dónde                                                     | Dueño    |
 | - | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------- |
-| 1 | **Las rutas de carrito y pedidos no están montadas.** `Montar` está vacío: el checkout, la consulta y la gestión de pedidos responden 404 en producción, aunque los handlers y sus pruebas existen | `backend/internal/adapters/rest/handlers/pedidos/rutas.go` | Nicolás  |
-| 2 | **Mercado Pago cobra sin el envío y el webhook no compara montos.** La preferencia lleva solo las líneas de productos y el pedido se confirma con lo que se haya acreditado | `handlers/pagos/iniciar.go`, `webhook.go`                 | Agustín  |
-| 3 | `POST /api/pedidos/{id}/pago` no verifica quién paga, ni el vencimiento de la reserva, ni si ya hay un intento activo (H14) | `handlers/pagos/iniciar.go`                               | Agustín  |
-| 4 | No hay vencimiento automático de los pedidos de Mercado Pago a los 15 minutos: una reserva abandonada bloquea stock para siempre (H14) | `usecases/pedidos` / `pagos`                              | Agustín  |
-| 5 | `GET /api/cuenta` no devuelve roles ni permisos (la barra los necesita)                                     | `handlers/identidad/rutas.go`                             | Yasmín   |
+| 1 | **Las rutas de carrito y pedidos no están montadas.** `Montar` está vacío: el checkout, la consulta y la gestión de pedidos responden 404 en producción, aunque los handlers y sus pruebas existen | `backend/internal/adapters/rest/handlers/pedidos/rutas.go` | Nicolás · **corregido** |
+| 2 | **Mercado Pago cobra sin el envío y el webhook no compara montos.** La preferencia lleva solo las líneas de productos y el pedido se confirma con lo que se haya acreditado | `handlers/pagos/iniciar.go`, `webhook.go`                 | Agustín · **corregido** |
+| 3 | `POST /api/pedidos/{id}/pago` no verifica quién paga, ni el vencimiento de la reserva, ni si ya hay un intento activo (H14) | `handlers/pagos/iniciar.go`                               | Agustín · **corregido** |
+| 4 | No hay vencimiento automático de los pedidos de Mercado Pago a los 15 minutos: una reserva abandonada bloquea stock para siempre (H14) | `handlers/pagos/vencimiento.go`                           | Agustín · **corregido** |
+| 5 | `GET /api/cuenta` no devuelve roles ni permisos (la barra los necesita)                                     | `handlers/identidad/rutas.go`                             | Yasmín · **corregido** |
 | 6 | Sin pruebas de dominio en catálogo (`usecases/catalogo` no tiene `_test.go`)                               | `backend/internal/usecases/catalogo/`                     | Genaro   |
 | 7 | Documentación desactualizada: el README menciona `deploy/nginx/` (no existe) y un CD por SSH que el workflow ya no hace; ADR-005 describe ese mismo job | `readme.md`, `docs/adr/ADR-005-despliegue.md`             | Agustín  |
 | 8 | La rama `docs/diagrams` (diagrama entidad-relación) no está mergeada                                       | rama `docs/diagrams`                                      | Genaro   |
@@ -100,7 +100,7 @@ Se mantiene el reparto por **módulo de dominio, de punta a punta**: cada uno es
 
 ## 3. Los cuatro paquetes
 
-Cada paquete arranca con un arreglo de backend que no depende de nadie, para que el viernes 06/11 los cuatro estén trabajando mientras Genaro deja lista la base del frontend.
+El viernes 06/11, mientras Genaro deja lista la base del frontend, los otros tres revisan el arreglo de backend de su módulo (defectos 1 a 5, ya corregidos): lo leen línea por línea, lo prueban contra producción y lo aprueban en el PR. «Ship it, but own it»: lo que el dueño no pueda explicar no cuenta en la defensa.
 
 ### Genaro — Catálogo y sistema visual
 
@@ -121,7 +121,7 @@ Cada paquete arranca con un arreglo de backend que no depende de nadie, para que
 
 ### Yasmín — Identidad, panel y pruebas de permisos
 
-**Día 0:** `GET /api/cuenta` devuelve roles y permisos (defecto 5), con su prueba y su caso en `docs/api/identidad.http`.
+**Día 0:** revisar el defecto 5 (`GET /api/cuenta` con roles y permisos de la sesión, `dtos/identidad/cuenta.go`) y arrancar `/ingresar`.
 
 **Después:**
 - `/ingresar` y `/registro` con Server Actions; la cookie de sesión según ADR-007; «Salir».
@@ -133,7 +133,7 @@ Cada paquete arranca con un arreglo de backend que no depende de nadie, para que
 
 ### Nicolás — Carrito, checkout, consulta y flujo de punta a punta
 
-**Día 0:** montar las rutas de carrito, checkout, consulta y gestión de pedidos (defecto 1). Las direcciones son las de `docs/api.md` y las que ya usan los tests de los handlers. Después del deploy, correr `docs/api/pedidos.http` entero contra producción.
+**Día 0:** revisar el defecto 1 (las rutas de pedidos montadas en `handlers/pedidos/rutas.go`, con los dos adaptadores hacia catálogo e inventario). Después del deploy, correr `docs/api/pedidos.http` entero contra producción.
 
 **Después:**
 - `src/features/carrito/`: el carrito del invitado en `localStorage` y el del cliente contra la API, detrás de las mismas funciones (las usa el botón del detalle de Genaro).
@@ -145,7 +145,7 @@ Cada paquete arranca con un arreglo de backend que no depende de nadie, para que
 
 ### Agustín — Pagos, stock, back-office e infraestructura
 
-**Día 0 y 1:** defectos 2, 3 y 4, con sus pruebas en Go: el envío entra en la preferencia, el webhook confirma solo si el monto acreditado coincide con el total, iniciar el pago verifica comprador, vencimiento e intento activo, y un proceso vence los pedidos de Mercado Pago a los 15 minutos liberando stock.
+**Día 0:** revisar los defectos 2, 3 y 4 (`usecases/pagos/reglas.go`, `handlers/pagos/iniciar.go`, `webhook.go` y `vencimiento.go`) y probar en el sandbox de Mercado Pago lo que acá no se pudo: una compra con envío de punta a punta, y que la búsqueda de pagos por `external_reference` responda con el token de producción. Después, arrancar la infraestructura.
 
 **Después:**
 - `/admin/pedidos` con filtros por fecha y estado, y `/admin/pedidos/[id]` con despacho, entrega, «Completar pedido» en efectivo y cancelación con motivo y confirmación explícita del reintegro (H17, H18, H15).
@@ -160,9 +160,9 @@ Cada paquete arranca con un arreglo de backend que no depende de nadie, para que
 
 | Día            | Genaro                                         | Yasmín                                  | Nicolás                                   | Agustín                                            |
 | -------------- | ---------------------------------------------- | --------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| **vie 06/11**  | **Base del frontend mergeada**                 | Roles y permisos en `/api/cuenta`       | **Rutas de pedidos montadas y deployadas** | Envío en la preferencia y control de monto         |
-| sáb 07 – dom 08 | Catálogo `/` y `/variantes/[id]`              | `/ingresar`, `/registro`, cookie        | `features/carrito`, `/carrito`            | Verificaciones de iniciar pago y vencimiento a 15′ |
-| lun 09/11      | Detalle con «Agregar»                          | Layouts `(cuenta)` y `(admin)`, barra   | `/checkout` (retiro y efectivo)           | Servicio `web` + Nginx en producción               |
+| **vie 06/11**  | **Base del frontend mergeada**                 | Revisa el defecto 5; `/ingresar`        | Revisa el defecto 1; `pedidos.http` en producción | Revisa 2, 3 y 4; prueba en el sandbox de MP |
+| sáb 07 – dom 08 | Catálogo `/` y `/variantes/[id]`              | `/registro`, cookie de sesión           | `features/carrito`, `/carrito`            | Servicio `web` + Nginx en producción               |
+| lun 09/11      | Detalle con «Agregar»                          | Layouts `(cuenta)` y `(admin)`, barra   | `/checkout` (retiro y efectivo)           | Job del frontend en el CI                          |
 | **mar 10/11** — clase 14 · **TP N° 1** | Revisión del TP de cada uno; nadie mergea nada grande ese día | | | |
 | mié 11/11      | `/admin/productos` y `[id]`                    | `/cuenta`, `/admin`, `/admin/usuarios`  | Checkout con envío y Mercado Pago, `/pago/retorno` | `/admin/pedidos` y `[id]` con transiciones  |
 | jue 12/11      | Marcas, categorías, `/admin/sistema`           | `/admin/roles`, `e2e/sesiones.ts`       | `/seguimiento/[token]`, `/cuenta/pedidos` | Stock y proveedores; harness de Playwright         |

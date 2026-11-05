@@ -98,17 +98,21 @@ En `POST /api/pedidos`, la identidad sale de la sesión si la hay y el precio sa
 
 | Método | Ruta                       | Quién puede                                        | Sin sesión | Sin permiso | Ajeno | Historia |
 | ------ | -------------------------- | -------------------------------------------------- | ---------- | ----------- | ----- | -------- |
-| POST   | `/api/pedidos/{id}/pago`   | su comprador: sesión del dueño del pedido o token del invitado | **Pendiente** (ver abajo) | — | 404 | H14 |
+| POST   | `/api/pedidos/{id}/pago`   | su comprador: sesión del dueño del pedido o header `X-Token-Acceso` del invitado | 404 | — | 404 | H14 |
 | GET    | `/api/pedidos/{id}/pago`   | sesión, su comprador                               | 401        | —           | 404   | H14      |
 | POST   | `/api/pagos/webhook`       | Mercado Pago, con firma válida                     | 401 con firma inválida | — | — | H14   |
 
-## Diferencias entre este contrato y el código al 05/11/2026
+`POST /api/pedidos/{id}/pago` sin sesión ni token responde 404 y no 401: el pedido no existe para quien no prueba ser su comprador. Además rechaza con 409 un pedido que ya no espera el pago, una reserva vencida y un pedido que ya tiene un pago en curso en Mercado Pago (H14).
 
-Encontradas al escribir este archivo. Cada una es trabajo, no una corrección del contrato.
+## Diferencias entre este contrato y el código
 
-1. **Las rutas de carrito y pedidos no están montadas.** `backend/internal/adapters/rest/handlers/pedidos/rutas.go` tiene `Montar` vacío (un `TODO`): los handlers existen y sus pruebas pasan porque arman su propio router, pero el servidor no los expone. Toda la sección «Carrito y pedidos» responde 404 hoy.
-2. **`POST /api/pedidos/{id}/pago` no verifica quién paga.** Con sesión opcional y solo el id del pedido, cualquiera que conozca el UUID abre una preferencia nueva. La spec (H16) dice que un pedido ajeno no se alcanza modificando un identificador. **Pendiente:** el invitado se identifica con el token de su enlace privado; con sesión, el pedido tiene que ser suyo.
-3. **El mismo endpoint no verifica el vencimiento de la reserva ni si ya hay un intento activo** (H14: «permite reintentar si la reserva sigue vigente y no existe otro pago activo que pueda producir un cobro duplicado»).
-4. **La preferencia de Mercado Pago no incluye el envío.** Se arma con las líneas de productos, pero el intento registra el total con envío; y el webhook confirma el pedido sin comparar el monto acreditado con el total. Una compra con envío se cobra de menos y se confirma igual.
-5. **No hay vencimiento automático** de los pedidos de Mercado Pago a los 15 minutos (H14): `vence_en` se guarda y nadie lo usa.
-6. **`GET /api/cuenta` no devuelve roles ni permisos**, y la barra del panel tiene que mostrar el rol y solo los módulos habilitados (spec, sección 7, «Navegación»; ADR-007).
+Al escribir este archivo (05/11/2026) aparecieron seis diferencias con el código. Las seis se corrigieron en el mismo PR, con sus pruebas:
+
+| # | Diferencia | Corrección |
+| - | ---------- | ---------- |
+| 1 | Las rutas de carrito y pedidos no estaban montadas (`Montar` vacío): respondían 404 | `handlers/pedidos/rutas.go` monta las 15 rutas con el control de esta tabla; `rutas_test.go` lo verifica |
+| 2 | `POST /api/pedidos/{id}/pago` no verificaba quién paga | Sesión del dueño o `X-Token-Acceso`; si no, 404 (`usecases/pagos.PuedeIniciarPago`) |
+| 3 | No verificaba el vencimiento de la reserva ni si había un pago en curso | 409 para reserva vencida o pedido no pendiente; consulta a Mercado Pago por `external_reference` antes de abrir otro pago |
+| 4 | La preferencia no incluía el envío y el webhook confirmaba sin comparar montos | El envío entra como una línea más; el webhook solo confirma si lo acreditado es el total y el pedido sigue pendiente (`DecidirConfirmacion`) |
+| 5 | No había vencimiento automático a los 15 minutos | `handlers/pagos/vencimiento.go`, cada minuto: cancela y libera stock, salvo que Mercado Pago tenga un pago en curso o no responda |
+| 6 | `GET /api/cuenta` no devolvía roles ni permisos | Devuelve los de la sesión (`dtos/identidad.RespuestaCuenta`) |
