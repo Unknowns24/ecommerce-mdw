@@ -1,8 +1,10 @@
 # Especificación del sistema — BC Importados
 
-**Versión:** 0.1 — borrador para revisión del equipo  
-**Fecha:** 18 de septiembre de 2026  
+**Versión:** 0.2 — borrador para revisión del equipo  
+**Fecha:** 5 de noviembre de 2026 (v0.1: 18 de septiembre de 2026)  
 **Proyecto:** Metodologías y Desarrollo Web — UAI
+
+**Cambios de la v0.2:** se agregan el mapa de pantallas (sección 5), los requisitos de interfaz, formularios y pruebas que piden las clases 10 a 13 (sección 7) y una propuesta de recorte para el Parcial II (sección 9). El contrato de la API con la columna de permisos está en [`docs/api.md`](api.md).
 
 Este documento reúne las decisiones del equipo para la primera versión del e-commerce de BC Importados. Conserva las nueve secciones del ejemplo de la materia. El negocio está funcionando, pero no se realizó un relevamiento completo con sus dueños; por eso describe la propuesta del equipo y no una aprobación del cliente.
 
@@ -329,6 +331,66 @@ Las historias administrativas requieren sesión y el permiso correspondiente, sa
 - Aprobación tardía: no se confirma sin verificar nuevamente la disponibilidad si la reserva fue liberada.
 - Cancelación: la administración registra la resolución y sus consecuencias; no modifica retroactivamente el detalle del pedido.
 
+### El mapa de pantallas
+
+Una fila por paso del flujo principal: qué pantalla lo resuelve, en qué dirección y quién la puede abrir. **Las direcciones se fijan acá antes de escribir la pantalla** y no las inventa un asistente: una URL que ya se compartió (el enlace privado del invitado, la vuelta de Mercado Pago) no se puede cambiar sin romperla. Si falta una fila, se agrega acá primero.
+
+Las pantallas se agrupan en tres grupos de ruta de Next.js, que no aparecen en la URL:
+
+| Grupo      | Layout                                                                                                    | Sesión                                         |
+| ---------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `(tienda)` | Encabezado de la tienda: nombre, búsqueda, carrito y «Ingresar» o el nombre de quien tiene sesión          | Opcional                                       |
+| `(cuenta)` | El de la tienda, más el menú de la cuenta                                                                 | Obligatoria; sin sesión redirige a `/ingresar` |
+| `(admin)`  | Barra del panel: nombre del sistema, quién sos, tus roles, los módulos que tus permisos habilitan y «Salir» | Obligatoria y con algún permiso administrativo |
+
+La redirección del layout es experiencia de uso, no autorización: cada endpoint del backend verifica sesión y permiso por su cuenta (sección 6, «Identidad y autorización»).
+
+**Flujo principal — compra web con Mercado Pago**
+
+| Paso | Pantalla                                      | Dirección                         | Quién la abre                     | Historia     |
+| ---- | --------------------------------------------- | --------------------------------- | --------------------------------- | ------------ |
+| 1    | Catálogo: búsqueda, filtros y orden           | `/`                               | Cualquiera                        | H04          |
+| 1    | Detalle de una variante y sus alternativas    | `/variantes/[id]`                 | Cualquiera                        | H05          |
+| 2    | Carrito                                       | `/carrito`                        | Cualquiera                        | H07          |
+| 3    | Ingresar (opcional antes de comprar)          | `/ingresar`                       | Sin sesión                        | H02          |
+| 3    | Registrarse (opcional)                        | `/registro`                       | Sin sesión                        | H02          |
+| 3–5  | Checkout: datos, entrega y resumen            | `/checkout`                       | Cualquiera con carrito no vacío   | H13          |
+| 6    | No es una pantalla: crea el pedido el servidor | —                                 | —                                 | H13          |
+| 7    | No es una pantalla: redirige a Mercado Pago   | `init_point` de Mercado Pago      | —                                 | H14          |
+| 7    | Vuelta de Mercado Pago                        | `/pago/retorno?estado=…`          | Cualquiera                        | H14          |
+| 8    | No es una pantalla: webhook del proveedor     | `POST /api/pagos/webhook`         | Mercado Pago                      | H14          |
+| 9    | Pedido del invitado, por enlace privado       | `/seguimiento/[token]`            | Quien tenga el enlace             | H16          |
+| 9    | Mis pedidos                                   | `/cuenta/pedidos`                 | Cliente registrado                | H16          |
+| 9    | Detalle de un pedido propio                   | `/cuenta/pedidos/[id]`            | Su comprador                      | H16          |
+| 10   | Pedidos del panel                             | `/admin/pedidos`                  | Permiso `pedidos.gestionar`       | H17          |
+| 10   | Detalle, despacho, entrega y cancelación      | `/admin/pedidos/[id]`             | Permiso `pedidos.gestionar`       | H17, H18     |
+
+**Alternativa — efectivo con retiro:** usa las mismas pantallas. En `/checkout` el efectivo aparece solo si se eligió retiro y está habilitado; el pedido nace confirmado y la pantalla siguiente es el detalle del pedido (`/seguimiento/[token]` o `/cuenta/pedidos/[id]`), sin pasar por Mercado Pago. «Completar pedido» se registra en `/admin/pedidos/[id]`.
+
+`/pago/retorno` vuelve con la dirección que arma el backend (`PUBLIC_BASE_URL + /pago/retorno?estado=aprobado|rechazado|pendiente`): esta fila no se puede mover sin cambiar el cliente de Mercado Pago. La pantalla **nunca** muestra el pedido como pagado por el parámetro `estado`: informa que el pago se está verificando y lleva al detalle del pedido, que consulta el estado real al servidor.
+
+**Propuesta para revisión:** el invitado ve su enlace privado (`/seguimiento/[token]`) en la confirmación del checkout, antes de ir a Mercado Pago, y el frontend lo guarda en una cookie propia de corta duración para que `/pago/retorno` lo pueda llevar a su pedido. El token no viaja a Mercado Pago en las `back_urls`.
+
+**Otras pantallas** (no son pasos del flujo, pero son las que hacen CRUD y demuestran los roles)
+
+| Pantalla                                         | Dirección                             | Quién la abre                          | Historia |
+| ------------------------------------------------ | ------------------------------------- | -------------------------------------- | -------- |
+| Mi cuenta: datos y cierre de sesión              | `/cuenta`                             | Cualquier sesión                       | H02      |
+| Inicio del panel: accesos según permisos         | `/admin`                              | Algún permiso administrativo           | —        |
+| Productos: listado y alta                        | `/admin/productos`                    | `catalogo.escribir`                    | H08      |
+| Producto: edición, variantes e imágenes          | `/admin/productos/[id]`               | `catalogo.escribir`                    | H08      |
+| Marcas                                           | `/admin/marcas`                       | `catalogo.escribir`                    | H08      |
+| Categorías y subcategorías                       | `/admin/categorias`                   | `catalogo.escribir`                    | H08      |
+| Proveedores                                      | `/admin/proveedores`                  | `stock.gestionar`                      | H08, H09 |
+| Stock de una variante: lotes, movimientos, ajuste | `/admin/stock/[varianteId]`           | `stock.gestionar`                      | H09      |
+| Ingreso de lote                                  | `/admin/stock/lotes/nuevo`            | `stock.gestionar`                      | H09      |
+| Cuentas administrativas                          | `/admin/usuarios`                     | Dueño con `usuarios.gestionar`         | H03      |
+| Roles                                            | `/admin/roles`                        | Dueño con `usuarios.gestionar`         | H03      |
+| Galería del sistema visual                       | `/admin/sistema`                      | Algún permiso administrativo           | —        |
+| Inicialización del dueño                         | No es una pantalla: `POST /api/auth/bootstrap`, una sola vez por instalación | Responsable de instalación | H01 |
+
+Las historias recortadas en la sección 9 no tienen pantalla en esta versión.
+
 ## 6. Reglas de negocio
 
 ### Identidad y autorización
@@ -403,6 +465,7 @@ Los estados del pedido, del pago y de la factura se distinguen. «Confirmado» n
 - Productos, cantidades, precios, descuentos, comprador y domicilio del pedido se conservan como copia histórica. Correcciones operativas no alteran silenciosamente lo comprado.
 - La misma notificación o acción repetida no duplica pedidos, cobros registrados, movimientos, usos de cupón ni solicitudes fiscales.
 - **Pendiente crítico de integración:** medios MP admitidos, vigencia de la operación externa, consulta al vencer y notificaciones tardías. Una preferencia vencida o un temporizador local no bastan para asumir ausencia de pago.
+  - **Propuesta en el Issue #14** (sin decidir; sigue Pendiente): la preferencia vence junto con la reserva (`expiration_date_to = vence_en`), y al vencer, si Mercado Pago informa un pago aprobado sin webhook, se aplica la misma regla que en el webhook: se confirma solo si el pedido sigue pendiente y se acreditó su total; si no, se registra una incidencia. Los medios admitidos no forman parte de la propuesta.
 - **Propuesta de contingencia:** si llega una aprobación después de liberar unidades, detener la confirmación automática y registrar una incidencia. Verificar disponibilidad y resolver de forma controlada; si no puede cumplirse, tramitar cancelación/reintegro externo. El pedido nunca se completa con stock negativo ni se informa reembolsado sin intervención administrativa.
 
 ### Cancelaciones y auditoría
@@ -484,6 +547,52 @@ El nombre del indicador es «Total vendido», no «Total facturado», porque su 
 - El contraste entre texto y fondo alcanza 4,5:1 y 3:1 para texto grande.
 - Los errores no se comunican solo mediante color: incluyen texto.
 
+### Interfaz: estados, navegación y formularios
+
+Criterios verificables uno por uno. Se chequean sobre las pantallas del mapa de la sección 5.
+
+**Los cinco estados de una pantalla que lee datos**
+
+| Estado          | Qué le pasó a la persona                      | Criterio                                                                                                     |
+| --------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Cargando        | Pidió algo y todavía no llegó                 | Esqueleto con la forma del contenido (no un spinner centrado): no hace saltar la página cuando llega         |
+| Con datos       | Lo normal                                     | —                                                                                                            |
+| Vacío           | No hay nada cargado todavía                   | Dice qué pasa y, si corresponde, ofrece la acción que lo resuelve: «Todavía no hiciste pedidos» → al catálogo |
+| Sin resultados  | Hay datos, pero la búsqueda no coincide       | Texto distinto del vacío, nombrando lo buscado y cómo limpiar los filtros                                     |
+| Error           | El sistema falló y no es culpa de la persona  | Dice que el problema es del sistema, que no se perdió nada y ofrece «Reintentar». Nunca muestra el mensaje técnico: el detalle va al log del servidor |
+
+En el catálogo, «sin resultados» lo resuelve la combinación de búsqueda y filtros y «vacío» es un catálogo sin variantes activas: son dos textos distintos. Una variante agotada no es un estado vacío: se muestra con «SIN STOCK» (H04).
+
+**Navegación**
+
+- En cualquier pantalla se puede contestar sin hacer nada: ¿dónde estoy? (nombre de la tienda, link al inicio), ¿quién soy? (nombre y, en el panel, sus roles) y ¿cómo salgo? («Salir», siempre en el mismo lugar).
+- En el panel solo aparecen los módulos que habilitan los permisos de la cuenta. Esconder un acceso es cortesía: la operación la sigue verificando el backend.
+- El 404 no cuenta de más: «no existe» y «no es tuyo» se responden con el mismo texto, sin la palabra «permiso». La pantalla del enlace privado del invitado tiene su propio 404 («No encontramos ese pedido»), porque ahí no hay nadie con sesión.
+- El 404 se dibuja dentro del layout de su grupo, con la navegación: quien llegó por un enlace viejo tiene a dónde ir.
+
+**Sistema visual**
+
+- Los colores, el radio y la tipografía se definen una sola vez, como tokens en `frontend/src/app/globals.css`. La spec no fija valores: fija los criterios de contraste y color de la sección «Accesibilidad».
+- Ninguna pantalla escribe a mano bordes, radios ni sombras: usa los componentes base de `components/ui/`. Los componentes que conocen el dominio (estado del pedido, precio con promoción, «SIN STOCK») viven en `components/` y traducen el valor del backend a texto y color.
+- `/admin/sistema` muestra cada componente con todos sus estados —incluidos un texto larguísimo, un pedido en cada estado y un error— para revisar contraste y foco en una sola pantalla.
+
+**Formularios** (registro, ingreso, cuenta, checkout y todos los del panel)
+
+- **Dos errores, dos lugares.** El error de validación (400 del backend, `detalles.campos`) se muestra debajo de su campo; el rechazo de una regla de negocio (409) se muestra arriba del formulario, con los datos que la historia pide enumerar (por ejemplo, variante → unidades disponibles en H13).
+- **Un formulario que falla no se vacía:** vuelve con lo que la persona había escrito.
+- **Mientras se envía, el botón se deshabilita y dice qué está pasando** («Creando pedido…»). Es la mitad de la defensa contra el doble envío; la otra mitad es la idempotencia del backend (sección 6).
+- **Lo que el cliente no necesita elegir, el cliente no lo manda.** La identidad sale de la sesión; el id del recurso, de la URL. Ningún formulario lleva un `input type="hidden"` con un id de usuario, un rol o un precio.
+- **Después de escribir, ninguna pantalla queda vieja:** cada mutación invalida las pantallas cuyo contenido cambió (por ejemplo, despachar invalida `/admin/pedidos` y `/admin/pedidos/[id]`) y redirige según el mapa de pantallas.
+- Todo campo tiene su etiqueta asociada, y el error se conecta al campo para que un lector de pantalla lo lea.
+- **Mobile-first:** se diseña primero a 375px de ancho —botones principales a lo ancho, `<select>` nativo, teclado numérico (`inputMode="numeric"`) para DNI y teléfono, sin acciones que solo aparecen con hover— y el ancho se agrega después. Las tablas del panel tienen su propio desplazamiento horizontal; la página nunca.
+
+**Cómo se verifica antes de cada entrega**
+
+- El flujo principal se recorre entero con teclado (Tab y Enter), con el foco visible en todo momento.
+- El flujo principal se recorre a 375px sin cortes ni desplazamiento horizontal.
+- El checkout se recorre en un teléfono real contra la URL de producción, con datos móviles, y lo que se vio queda anotado en el PR.
+- Apretar dos veces seguidas el botón de un formulario no crea dos registros.
+
 ### Seguridad e integridad
 
 - Contraseñas almacenadas mediante hash seguro; secretos de bootstrap e integraciones solo en servidor.
@@ -500,6 +609,23 @@ El nombre del indicador es «Total vendido», no «Total facturado», porque su 
 - Las integraciones tienen estados de error trazables y reintentos que no duplican efectos.
 - La compra pendiente de confirmación externa no se presenta como pagada por un timeout.
 - **Pendiente del equipo:** objetivos medibles de rendimiento y disponibilidad, volumen de prueba, copias de seguridad/restauración y política operativa de reintentos. No se inventan tiempos de respuesta o cargas no acordadas.
+
+### Calidad y pruebas
+
+Lo que el sistema tiene que demostrar solo, en cada Pull Request, sin que nadie se acuerde de probarlo a mano. El cómo (herramientas, carpetas, comandos) está en [`AGENTS.md`](../AGENTS.md), sección «Pruebas».
+
+| Capa     | Qué contesta                                                                  | De dónde sale el valor esperado                         |
+| -------- | ----------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Dominio  | ¿La regla calcula bien? Totales, tarifas por rango, FIFO/LIFO, transiciones   | Las reglas de la sección 6 de esta spec                 |
+| Permisos | ¿El backend dice que no cuando corresponde, aunque nadie pase por la pantalla? | La columna «Quién puede» de [`docs/api.md`](api.md)     |
+| Flujo    | ¿Se recorre la compra entera, de una persona a otra?                          | El flujo principal y el mapa de pantallas de la sección 5 |
+
+- El flujo principal tiene una prueba de punta a punta desde un navegador, un paso por cada fila del mapa: el comprador busca, agrega al carrito, hace el checkout, el pago se aprueba, consulta su pedido y la administración lo despacha y lo entrega. Incluye al menos un caso de error en el medio del camino: pedir más unidades que las disponibles y ver el rechazo que las enumera (H13).
+- Cada fila de `docs/api.md` tiene su prueba de permisos contra el backend: sin sesión → 401; con sesión y sin el permiso → 403; recurso de otra persona → 404.
+- Al menos una de esas pruebas se vio fallar a propósito (sacando el control que prueba) y queda contado en el PR.
+- Las pruebas que escriben en la base corren contra una base local o del CI, nunca contra la de producción.
+- La aplicación no tiene un «modo prueba», usuarios mágicos ni condiciones que dependan de estar en una prueba: la sesión de las pruebas se fabrica afuera, con el secreto de prueba.
+- `main` no acepta un merge con alguna de estas capas en rojo.
 
 ## 8. Integración externa
 
@@ -584,6 +710,32 @@ Lo que no está recortado por escrito cuenta, en la defensa, como prometido y no
 - **Vencimiento automático** de pedidos de Mercado Pago sin pago y conciliación de pagos tardíos (sección 6): el pedido guarda `vence_en`, pero el módulo de pedidos no lo cancela automáticamente (a confirmar con el módulo de pagos si lo cubre).
 - Unión del carrito local con el de la cuenta al iniciar sesión y plazo de conservación del carrito.
 - Frontend.
+
+### Recorte del Parcial II — 17/11/2026 (propuesta para revisión)
+
+Las subsecciones anteriores dicen que lo recortado en el Parcial I «vuelve para el Parcial II». Al 05/11 el frontend no tiene ninguna pantalla y quedan doce días: sostener esa promesa haría que en la defensa todo cuente como prometido y no entregado. **Esta propuesta reemplaza esa promesa cuando el equipo la apruebe.** Lo que la rúbrica del Parcial II evalúa es el flujo principal desde la interfaz, la experiencia, el manejo de datos, las pruebas y la calidad del código; ninguna de las historias recortadas suma a esos criterios.
+
+**Entra para el Parcial II:**
+
+- Todas las pantallas del mapa de la sección 5, con los criterios de la sección 7 («Interfaz: estados, navegación y formularios»).
+- Las historias del backend que ya están implementadas, ahora operables desde la interfaz: H02, H03, H04, H05, H07, H08, H09, H13, H14, H15, H16, H17 y H18.
+- **Vencimiento automático** de los pedidos de Mercado Pago a los 15 minutos, con liberación de stock (H14). Sin esto, una reserva abandonada bloquea unidades para siempre y la variante con una sola unidad de la demo deja de poder comprarse.
+- Las pruebas de la sección 7 («Calidad y pruebas») corriendo en CI.
+
+**Queda fuera del Parcial II** (sigue descripto en sus historias y puede entrar para el Demo Day del 24/11 si el flujo está completo y probado):
+
+- Promociones (H11) y cupones (H12): el total sigue siendo subtotal más envío.
+- Favoritos y avisos de reposición (H06).
+- Venta externa (H10).
+- Facturación con la API fiscal (H19).
+- Estadísticas online (H20).
+- Edición de la configuración de la tienda y auditoría consultable (H21): la configuración se carga con `cmd/seed-pedidos`.
+- Notificaciones por correo y WhatsApp: el enlace privado se muestra en pantalla al crear el pedido.
+- Geocodificación y cálculo de ruta: la distancia de envío se sigue ingresando como dato del checkout.
+- Recuperación de contraseña por correo (parte de H02).
+- Unión del carrito local con el de la cuenta al iniciar sesión (H07): al ingresar, el carrito local se descarta o se conserva sin mezclar, según decida el equipo.
+
+**Pendiente:** el equipo aprueba o corrige esta lista antes del viernes 06/11. Lo que no quede escrito acá, en la defensa, cuenta como prometido.
 
 ### RFC futuros registrados
 

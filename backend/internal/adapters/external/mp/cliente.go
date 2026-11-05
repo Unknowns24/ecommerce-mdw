@@ -10,14 +10,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	apierr "github.com/Unknowns24/ecommerce-mdw/internal/adapters/rest/errors"
 )
 
 const (
-	urlPreferencias = "https://api.mercadopago.com/checkout/preferences"
-	urlPagos        = "https://api.mercadopago.com/v1/payments/"
+	urlPreferencias  = "https://api.mercadopago.com/checkout/preferences"
+	urlPagos         = "https://api.mercadopago.com/v1/payments/"
+	urlBusquedaPagos = "https://api.mercadopago.com/v1/payments/search"
 )
 
 // Cliente talks to the Mercado Pago sandbox/production API with a 10 second
@@ -49,6 +51,9 @@ type ItemPreferencia struct {
 type Preferencia struct {
 	PedidoID string
 	Items    []ItemPreferencia
+	// VenceEn, si no es nil, es el último instante en que se puede pagar la
+	// preferencia (Issue #14: el vencimiento de la reserva).
+	VenceEn *time.Time
 }
 
 // RespuestaPreferencia is what the checkout needs to redirect the comprador.
@@ -77,7 +82,13 @@ type crearPreferenciaRequest struct {
 	ExternalReference string                `json:"external_reference"`
 	BackURLs          backURLs              `json:"back_urls"`
 	NotificationURL   string                `json:"notification_url"`
+	Expires           bool                  `json:"expires,omitempty"`
+	ExpirationDateTo  string                `json:"expiration_date_to,omitempty"`
 }
+
+// formatoFechaMP es el formato de fecha que Mercado Pago acepta en
+// expiration_date_to: ISO 8601 con milisegundos y zona horaria.
+const formatoFechaMP = "2006-01-02T15:04:05.000-07:00"
 
 type backURLs struct {
 	Success string `json:"success"`
@@ -94,6 +105,17 @@ type crearPreferenciaResponse struct {
 // a tiempo o rechaza la request, el pedido no queda marcado como pagado: se
 // devuelve apierr.ErrRegla para que el handler lo traduzca a 409.
 func (c *Cliente) CrearPreferencia(ctx context.Context, p Preferencia) (RespuestaPreferencia, error) {
+	var respuesta crearPreferenciaResponse
+	if err := c.solicitar(ctx, http.MethodPost, urlPreferencias, c.cuerpoPreferencia(p), &respuesta); err != nil {
+		return RespuestaPreferencia{}, err
+	}
+
+	return RespuestaPreferencia{ID: respuesta.ID, InitPoint: respuesta.InitPoint}, nil
+}
+
+// cuerpoPreferencia arma el JSON que se le manda a Mercado Pago. Está
+// separado de CrearPreferencia para poder probarlo sin red.
+func (c *Cliente) cuerpoPreferencia(p Preferencia) crearPreferenciaRequest {
 	items := make([]itemPreferenciaJSON, len(p.Items))
 	for i, item := range p.Items {
 		items[i] = itemPreferenciaJSON{
@@ -117,13 +139,11 @@ func (c *Cliente) CrearPreferencia(ctx context.Context, p Preferencia) (Respuest
 		},
 		NotificationURL: c.baseURL + "/api/pagos/webhook",
 	}
-
-	var respuesta crearPreferenciaResponse
-	if err := c.solicitar(ctx, http.MethodPost, urlPreferencias, cuerpo, &respuesta); err != nil {
-		return RespuestaPreferencia{}, err
+	if p.VenceEn != nil {
+		cuerpo.Expires = true
+		cuerpo.ExpirationDateTo = p.VenceEn.Format(formatoFechaMP)
 	}
-
-	return RespuestaPreferencia{ID: respuesta.ID, InitPoint: respuesta.InitPoint}, nil
+	return cuerpo
 }
 
 type pagoResponse struct {
@@ -142,12 +162,55 @@ func (c *Cliente) ObtenerPago(ctx context.Context, pagoID string) (Pago, error) 
 		return Pago{}, err
 	}
 
+	return pagoDesdeRespuesta(respuesta), nil
+}
+
+func pagoDesdeRespuesta(r pagoResponse) Pago {
 	return Pago{
-		ID:                fmt.Sprintf("%d", respuesta.ID),
-		Estado:            respuesta.Status,
-		MontoCentavos:     int64(respuesta.TransactionAmount*100 + 0.5),
-		ReferenciaExterna: respuesta.ExternalReference,
-	}, nil
+		ID:                fmt.Sprintf("%d", r.ID),
+		Estado:            r.Status,
+		MontoCentavos:     int64(r.TransactionAmount*100 + 0.5),
+		ReferenciaExterna: r.ExternalReference,
+	}
+}
+
+type busquedaPagosResponse struct {
+	Results []pagoResponse `json:"results"`
+}
+
+// PagosDelPedido devuelve cada pago que Mercado Pago tiene asociado al pedido
+// (external_reference), con su estado y su monto. Es la fuente de verdad para
+// saber si ya hay un cobro en curso o uno aprobado: el webhook puede llegar
+// tarde o no llegar, así que la tabla local no alcanza.
+func (c *Cliente) PagosDelPedido(ctx context.Context, pedidoID string) ([]Pago, error) {
+	var respuesta busquedaPagosResponse
+	direccion := urlBusquedaPagos + "?external_reference=" + url.QueryEscape(pedidoID)
+	if err := c.solicitar(ctx, http.MethodGet, direccion, nil, &respuesta); err != nil {
+		return nil, err
+	}
+	pagos := make([]Pago, len(respuesta.Results))
+	for i, r := range respuesta.Results {
+		pagos[i] = pagoDesdeRespuesta(r)
+	}
+	return pagos, nil
+}
+
+// EstadosDePagosDelPedido devuelve solo los estados de PagosDelPedido.
+func (c *Cliente) EstadosDePagosDelPedido(ctx context.Context, pedidoID string) ([]string, error) {
+	pagos, err := c.PagosDelPedido(ctx, pedidoID)
+	if err != nil {
+		return nil, err
+	}
+	return EstadosDe(pagos), nil
+}
+
+// EstadosDe devuelve el estado de cada pago, en el mismo orden.
+func EstadosDe(pagos []Pago) []string {
+	estados := make([]string, len(pagos))
+	for i, p := range pagos {
+		estados[i] = p.Estado
+	}
+	return estados
 }
 
 func (c *Cliente) solicitar(ctx context.Context, metodo, url string, cuerpo any, destino any) error {

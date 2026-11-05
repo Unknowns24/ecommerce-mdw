@@ -84,8 +84,8 @@ Content-Type: application/json
 @pedidoId = {{flujo.response.body.$.id}}
 @tokenAcceso = {{flujo.response.body.$.tokenAcceso}}
 
-### Paso 3 — iniciar el pago con Mercado Pago (módulo de Agustín) → 200 con init_point
-# ⚠ A confirmar con Agustín: cómo se manda el token del invitado en esta ruta (acá, un header).
+### Paso 3 — iniciar el pago con Mercado Pago (módulo de Agustín) → 201 con initPoint
+# El invitado manda el token de su enlace privado en el header X-Token-Acceso (docs/api/pagos.http).
 POST {{base}}/api/pedidos/{{pedidoId}}/pago
 X-Token-Acceso: {{tokenAcceso}}
 
