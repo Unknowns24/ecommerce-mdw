@@ -33,6 +33,8 @@ El job `desplegar` por SSH descripto en la Decisión no existe. El pipeline real
   - desde `main`: `ghcr.io/unknowns24/ecommerce-mdw/backend`, con los tags `<sha>` y `latest`;
   - desde un tag `v*`: la misma imagen `backend`, con los tags `<versión>`, `<sha>` y `latest`.
 
-El pipeline no entra a la VPS. Producción corre `backend:latest`, y Watchtower, en la VPS, detecta la imagen nueva en GHCR y reinicia el contenedor `api`. Las migraciones se corren a mano en la VPS con `docker compose run --rm api /api migrate`.
+El pipeline no entra a la VPS. Producción corre `backend:latest`, y Watchtower, en la VPS, detecta la imagen nueva en GHCR y reinicia el contenedor `api`. Las migraciones se corren a mano en la VPS con `docker compose run --rm api migrate`.
 
 **Consecuencia:** como Watchtower reinicia `api` en cuanto aparece la imagen nueva, una versión que trae migraciones puede quedar corriendo antes de que alguien las aplique. Eso se aparta de lo que pide ADR-002 (migrar antes de levantar el servidor nuevo). Hasta que se decida otra cosa, quien mergea a `main` un cambio con migraciones las corre en la VPS apenas se publica la imagen.
+
+El `ENTRYPOINT` de la imagen ya es `/api`: el argumento de `docker compose run` es solo el subcomando (`migrate`). Con `run --rm api /api migrate`, el primer argumento es `/api` y lo que se levanta es el servidor, no las migraciones.

@@ -58,7 +58,7 @@ curl https://mdw.unkcode.com/api/salud
 # {"estado":"ok","version":"<git-sha-corto>"}
 ```
 
-**Cómo llega una versión a producción** ([ADR-005](docs/adr/ADR-005-despliegue.md#actualización--2026-11-05)): `.github/workflows/cicd.yaml` corre `verificar` en cada push y cada PR; si pasa, `publicar-imagen` sube la imagen a GHCR: `backend-staging` desde `develop` y `backend` desde `main` y desde los tags `v*`. En la VPS, Watchtower detecta el `backend:latest` nuevo y reinicia el contenedor `api`. Las migraciones no corren solas: se aplican a mano en la VPS con `docker compose run --rm api /api migrate`.
+**Cómo llega una versión a producción** ([ADR-005](docs/adr/ADR-005-despliegue.md#actualización--2026-11-05)): `.github/workflows/cicd.yaml` corre `verificar` en cada push y cada PR; si pasa, `publicar-imagen` sube la imagen a GHCR: `backend-staging` desde `develop` y `backend` desde `main` y desde los tags `v*`. En la VPS, Watchtower detecta el `backend:latest` nuevo y reinicia el contenedor `api`. Las migraciones no corren solas: se aplican a mano en la VPS con `docker compose run --rm api migrate`.
 
 ## Backend
 
@@ -80,7 +80,7 @@ Con Docker, además del backend hace falta levantar Postgres:
 cp .env.example .env               # POSTGRES_USER / PASSWORD / DB del contenedor db
 cp backend/.env.example backend/.env
 docker compose up -d --build
-docker compose run --rm api /api migrate
+docker compose run --rm api migrate
 ```
 
 ### Datos de prueba
