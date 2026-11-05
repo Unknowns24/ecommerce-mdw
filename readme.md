@@ -39,15 +39,13 @@ backend/          API en Go
   cmd/            puntos de entrada y comandos operativos (api, seed)
   internal/       casos de uso, dominio y adaptadores privados
   Dockerfile      build multi-stage, usuario no root
-deploy/
-  nginx/          referencia del reverse proxy con TLS para la VPS
 docs/
   specs.md        especificación funcional
   adr/            decisiones de arquitectura aceptadas
   rfc/            propuestas y decisiones pendientes
   api/            requests .http de prueba, por módulo
 docker-compose.yml  servicio api + Postgres 16 con volumen persistente
-.github/workflows/  CI (build/vet/test/gofmt) y CD (deploy por SSH a main)
+.github/workflows/  CI (build/vet/test/gofmt) y publicación de la imagen del backend en GHCR
 frontend/         tienda y panel en Next.js
 ```
 
@@ -59,6 +57,8 @@ frontend/         tienda y panel en Next.js
 curl https://mdw.unkcode.com/api/salud
 # {"estado":"ok","version":"<git-sha-corto>"}
 ```
+
+**Cómo llega una versión a producción** ([ADR-005](docs/adr/ADR-005-despliegue.md#actualización--2026-11-05)): `.github/workflows/cicd.yaml` corre `verificar` en cada push y cada PR; si pasa, `publicar-imagen` sube la imagen a GHCR: `backend-staging` desde `develop` y `backend` desde `main` y desde los tags `v*`. En la VPS, Watchtower detecta el `backend:latest` nuevo y reinicia el contenedor `api`. Las migraciones no corren solas: se aplican a mano en la VPS con `docker compose run --rm api /api migrate`.
 
 ## Backend
 
