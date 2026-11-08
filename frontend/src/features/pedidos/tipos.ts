@@ -65,3 +65,54 @@ export type RespuestaPago = { initPoint: string };
 export type PedidoSinPago = { id: string; numero: number; enlace: string; privado: boolean };
 
 export type EstadoCheckout = EstadoFormulario & { pedido?: PedidoSinPago };
+
+// --- Consulta: GET /api/pedidos, /api/pedidos/{id}, /api/pedidos/publico/{token} ---
+
+export type LineaPedido = {
+  codigo: string;
+  nombre: string;
+  unidades: number;
+  /** Precio histórico: el de cuando se creó el pedido, no el del catálogo de hoy. */
+  precioUnitarioCentavos: number;
+  subtotalCentavos: number;
+};
+
+/** Lo que muestran las dos vistas (propia y pública, que es la reducida). */
+export type PedidoVisible = {
+  numero: number;
+  modoEntrega: ModoEntrega;
+  domicilio?: string;
+  distanciaMetros?: number;
+  envioCentavos: number;
+  subtotalCentavos: number;
+  totalCentavos: number;
+  estadoPedido: EstadoPedido;
+  estadoPago: EstadoPago;
+  medioPago: MedioPago;
+  /** Vencimiento de la reserva de Mercado Pago (ISO). Efectivo no vence. */
+  venceEn?: string;
+  creadoEn: string;
+  detalles: LineaPedido[];
+};
+
+/** GET /api/pedidos/{id}: la vista propia (la pública no trae id). */
+export type PedidoPropio = PedidoVisible & { id: string };
+
+/** Fila del listado «Mis pedidos». */
+export type PedidoResumen = {
+  id: string;
+  numero: number;
+  modoEntrega: ModoEntrega;
+  medioPago: MedioPago;
+  estadoPedido: EstadoPedido;
+  estadoPago: EstadoPago;
+  totalCentavos: number;
+  creadoEn: string;
+};
+
+export type PaginaPedidos = {
+  items: PedidoResumen[];
+  total: number;
+  pagina: number;
+  tamano: number;
+};
