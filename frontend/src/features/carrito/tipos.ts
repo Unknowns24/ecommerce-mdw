@@ -57,3 +57,6 @@ export type EstadoCarrito = EstadoFormulario & {
   modo?: "cliente" | "invitado";
   unidades?: number;
 };
+
+/** Rechazo 409 del carrito del cliente, para mostrarlo arriba de la lista. */
+export type ConflictoCarrito = { mensaje: string; detalles: unknown };

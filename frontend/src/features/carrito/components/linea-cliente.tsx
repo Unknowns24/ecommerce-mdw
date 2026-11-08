@@ -1,29 +1,42 @@
 "use client";
 
 import { useActionState } from "react";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Campo } from "@/components/campo";
 import { cambiarUnidadesAction, quitarItemAction } from "../acciones";
 import { ESTADO_INICIAL } from "../estado-inicial";
-import { textoDisponibles, unidadesDisponibles } from "../disponibles";
-import type { EstadoCarrito, LineaCarrito } from "../tipos";
+import type { ConflictoCarrito, EstadoCarrito, LineaCarrito } from "../tipos";
 import { DatosLinea, SubtotalLinea } from "./datos-linea";
 
 // Línea del carrito de quien tiene sesión. El id de la línea sale de la lista
 // del servidor y se ata con .bind: el formulario no manda ids ni precios.
 // Sin redirect: la acción revalida y la página se actualiza en el lugar.
-export function LineaCliente({ linea }: { linea: LineaCarrito }) {
+// El 409 no se dibuja acá sino arriba de la lista (ListaCliente): esta línea
+// se lo avisa con `alConflicto`. El 400 sí queda debajo del campo.
+export function LineaCliente({
+  linea,
+  alConflicto,
+}: {
+  linea: LineaCarrito;
+  alConflicto: (conflicto: ConflictoCarrito | null) => void;
+}) {
   const [estado, cambiar, cambiando] = useActionState<EstadoCarrito, FormData>(
-    cambiarUnidadesAction.bind(null, linea.id),
+    async (prev, formData) => {
+      const nuevo = await cambiarUnidadesAction(linea.id, prev, formData);
+      alConflicto(nuevo.mensaje ? { mensaje: nuevo.mensaje, detalles: nuevo.detalles } : null);
+      return nuevo;
+    },
     ESTADO_INICIAL,
   );
   const [, quitar, quitando] = useActionState<EstadoCarrito, FormData>(
-    quitarItemAction.bind(null, linea.id),
+    async () => {
+      const nuevo = await quitarItemAction(linea.id);
+      alConflicto(null);
+      return nuevo;
+    },
     ESTADO_INICIAL,
   );
-  const disponibles = unidadesDisponibles(estado.detalles, linea.varianteId);
   const ocupado = cambiando || quitando;
 
   return (
@@ -31,14 +44,6 @@ export function LineaCliente({ linea }: { linea: LineaCarrito }) {
       <Card>
         <CardContent className="flex flex-col gap-4">
           <DatosLinea linea={linea} />
-
-          {estado.mensaje ? (
-            // 409: la regla de negocio que rechazó el cambio, con las unidades que hay.
-            <Alert variant="destructive" role="alert">
-              {estado.mensaje}
-              {disponibles !== null ? ` ${textoDisponibles(disponibles)}` : null}
-            </Alert>
-          ) : null}
 
           <div className="flex flex-wrap items-end gap-3">
             {linea.disponible ? (

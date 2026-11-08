@@ -8,6 +8,7 @@ import { Campo } from "@/components/campo";
 import { ESTADO_INICIAL } from "../estado-inicial";
 import { agregarAction } from "../acciones";
 import { agregarAlCarritoInvitado } from "../almacen-invitado";
+import { textoDisponibles, unidadesDisponibles } from "../disponibles";
 import type { EstadoCarrito } from "../tipos";
 
 export function BotonAgregarAlCarrito(props: { varianteId: string; disponible: boolean }) {
@@ -46,9 +47,7 @@ function FormularioAgregar({ varianteId }: { varianteId: string }) {
       {estado.mensaje ? (
         <Alert variant="destructive" role="alert">
           {estado.mensaje}
-          {disponibles !== null
-            ? ` Hay ${disponibles} ${disponibles === 1 ? "unidad disponible" : "unidades disponibles"}.`
-            : null}
+          {disponibles !== null ? ` ${textoDisponibles(disponibles)}` : null}
         </Alert>
       ) : null}
       {agregado ? (
@@ -73,11 +72,4 @@ function FormularioAgregar({ varianteId }: { varianteId: string }) {
       </Button>
     </form>
   );
-}
-
-// El 409 trae detalles { "<varianteId>": <disponible> }.
-function unidadesDisponibles(detalles: unknown, varianteId: string): number | null {
-  if (typeof detalles !== "object" || detalles === null) return null;
-  const n = (detalles as Record<string, unknown>)[varianteId];
-  return typeof n === "number" ? n : null;
 }
