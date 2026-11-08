@@ -87,7 +87,7 @@ func nuevoEscenarioConsulta() *escenarioConsulta {
 			Detalles: []domain.DetallePublico{{Codigo: "PERF-01", Nombre: "Perfume", Unidades: 2, PrecioUnitarioCentavos: 1500050, SubtotalCentavos: 3000100}},
 		}},
 	}
-	h := NuevoHandler(nil, uc.NuevaConsulta(lector), nil, nil)
+	h := NuevoHandler(nil, uc.NuevaConsulta(lector), nil, nil, nil)
 	r := chi.NewRouter()
 	r.Get("/api/pedidos", h.ListarMisPedidos)
 	r.Get("/api/pedidos/publico/{token}", h.ObtenerPedidoPublico)
