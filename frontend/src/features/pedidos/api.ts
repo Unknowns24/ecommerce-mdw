@@ -3,7 +3,10 @@ import { api, ErrorApi } from "@/lib/api";
 import type {
   ConfiguracionTienda,
   CuerpoCrearPedido,
+  PaginaPedidos,
   PedidoCreado,
+  PedidoPropio,
+  PedidoVisible,
   RespuestaPago,
   Tarifa,
 } from "./tipos";
@@ -45,4 +48,21 @@ export function iniciarPago(pedidoId: string, tokenAcceso?: string): Promise<Res
     metodo: "POST",
     headers: tokenAcceso ? { "X-Token-Acceso": tokenAcceso } : undefined,
   });
+}
+
+// --- Consulta (H16) ---------------------------------------------------------
+
+/** GET /api/pedidos: los del usuario de la sesión, paginados. */
+export function listarMisPedidos(pagina: number, tamano: number): Promise<PaginaPedidos> {
+  return api<PaginaPedidos>(`/api/pedidos?pagina=${pagina}&tamano=${tamano}`);
+}
+
+/** GET /api/pedidos/{id}: 404 si no existe o es de otra persona (el mismo 404). */
+export function leerPedido(id: string): Promise<PedidoPropio> {
+  return api<PedidoPropio>(`/api/pedidos/${encodeURIComponent(id)}`);
+}
+
+/** GET /api/pedidos/publico/{token}: la vista reducida del invitado. 404 con un token inválido. */
+export function leerPedidoPublico(token: string): Promise<PedidoVisible> {
+  return api<PedidoVisible>(`/api/pedidos/publico/${encodeURIComponent(token)}`);
 }
