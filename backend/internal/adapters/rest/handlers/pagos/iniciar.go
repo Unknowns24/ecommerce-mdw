@@ -2,21 +2,31 @@ package pagos
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/Unknowns24/ecommerce-mdw/internal/adapters/external/mp"
 	apierr "github.com/Unknowns24/ecommerce-mdw/internal/adapters/rest/errors"
+	"github.com/Unknowns24/ecommerce-mdw/internal/adapters/rest/middleware"
 	"github.com/Unknowns24/ecommerce-mdw/internal/core/domain"
+	reglas "github.com/Unknowns24/ecommerce-mdw/internal/usecases/pagos"
 )
 
 const endpointIniciarPago = "POST /api/pedidos/{id}/pago"
 
+// headerTokenAcceso lleva el token del enlace privado del invitado. Va en un
+// header y no en la URL para que no quede en los logs de acceso.
+const headerTokenAcceso = "X-Token-Acceso"
+
 // iniciarPago abre una preferencia de Mercado Pago para un pedido pendiente
-// de pago. Sesión opcional: el comprador invitado paga igual que el
-// registrado, esta ruta no decide identidad, sólo valida el estado del
-// pedido en el servidor.
+// de pago (H14). En orden:
+//
+//  1. ¿es del comprador?          sesión del dueño o header X-Token-Acceso; si no, 404.
+//  2. ¿sigue esperando el pago?   medio, estado y reserva vigente; si no, 409.
+//  3. ¿hay otro pago en curso?    se le pregunta a Mercado Pago; si hay, 409.
+//  4. abrir la preferencia        con las líneas y el envío: el total del pedido.
 func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 	pedidoID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -24,8 +34,13 @@ func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var usuarioID *uuid.UUID
+	if u, ok := middleware.UsuarioDeContexto(r.Context()); ok {
+		usuarioID = &u.ID
+	}
+
 	ctx := r.Context()
-	pedido, existe, err := pedidoPorID(ctx, h.db, pedidoID)
+	pedido, existe, err := pedidoPorID(ctx, h.db, pedidoID, false)
 	if err != nil {
 		apierr.Responder(w, endpointIniciarPago, err)
 		return
@@ -34,9 +49,19 @@ func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 		apierr.Responder(w, endpointIniciarPago, apierr.ErrNoEncontrado)
 		return
 	}
-	if pedido.MedioPago != string(domain.ProveedorMercadoPago) || pedido.EstadoPago != "PENDIENTE" {
+	if err := reglas.PuedeIniciarPago(pedido, usuarioID, r.Header.Get(headerTokenAcceso), time.Now()); err != nil {
+		apierr.Responder(w, endpointIniciarPago, err)
+		return
+	}
+
+	estados, err := h.mp.EstadosDePagosDelPedido(ctx, pedidoID.String())
+	if err != nil {
+		apierr.Responder(w, endpointIniciarPago, err)
+		return
+	}
+	if reglas.HayPagoActivo(estados) {
 		apierr.Responder(w, endpointIniciarPago, apierr.ErrRegla{
-			Mensaje: "Este pedido no está pendiente de pago con Mercado Pago",
+			Mensaje: "Ya hay un pago en curso para este pedido. Esperá su resultado antes de intentar de nuevo.",
 		})
 		return
 	}
@@ -47,18 +72,9 @@ func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items := make([]mp.ItemPreferencia, len(lineas))
-	for i, l := range lineas {
-		items[i] = mp.ItemPreferencia{
-			Titulo:                 l.Nombre,
-			Cantidad:               l.Unidades,
-			PrecioUnitarioCentavos: l.PrecioUnitarioCentavos,
-		}
-	}
-
 	respuesta, err := h.mp.CrearPreferencia(ctx, mp.Preferencia{
 		PedidoID: pedidoID.String(),
-		Items:    items,
+		Items:    itemsDePreferencia(lineas, pedido.EnvioCentavos),
 	})
 	if err != nil {
 		apierr.Responder(w, endpointIniciarPago, err)
@@ -79,4 +95,23 @@ func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apierr.JSON(w, http.StatusCreated, map[string]string{"initPoint": respuesta.InitPoint})
+}
+
+// itemsDePreferencia arma lo que Mercado Pago va a cobrar: las líneas del
+// pedido y, si hay envío, una línea más. La suma es el total del pedido
+// (total = subtotal + envío, lo exige un CHECK de la tabla), que es lo que el
+// webhook compara con lo acreditado.
+func itemsDePreferencia(lineas []lineaPedido, envioCentavos int64) []mp.ItemPreferencia {
+	items := make([]mp.ItemPreferencia, 0, len(lineas)+1)
+	for _, l := range lineas {
+		items = append(items, mp.ItemPreferencia{
+			Titulo:                 l.Nombre,
+			Cantidad:               l.Unidades,
+			PrecioUnitarioCentavos: l.PrecioUnitarioCentavos,
+		})
+	}
+	if envioCentavos > 0 {
+		items = append(items, mp.ItemPreferencia{Titulo: "Envío", Cantidad: 1, PrecioUnitarioCentavos: envioCentavos})
+	}
+	return items
 }

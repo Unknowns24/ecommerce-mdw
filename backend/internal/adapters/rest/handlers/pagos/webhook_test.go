@@ -47,6 +47,11 @@ func conectarParaTest(t *testing.T) *gorm.DB {
 			total_centavos bigint NOT NULL,
 			actualizado_en timestamptz NOT NULL DEFAULT now()
 		)`,
+		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS envio_centavos bigint NOT NULL DEFAULT 0`,
+		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS token_acceso varchar(64) NOT NULL DEFAULT ''`,
+		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS vence_en timestamptz`,
+		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS cancelado_en timestamptz`,
+		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS motivo_cancelacion varchar(500)`,
 		`CREATE TABLE IF NOT EXISTS detalle_pedido (
 			id uuid PRIMARY KEY,
 			pedido_id uuid NOT NULL REFERENCES pedido(id),
@@ -73,10 +78,15 @@ func conectarParaTest(t *testing.T) *gorm.DB {
 
 func crearPedidoDePrueba(t *testing.T, db *gorm.DB) uuid.UUID {
 	t.Helper()
+	return crearPedidoEnEstado(t, db, "PENDIENTE_DE_PAGO")
+}
+
+func crearPedidoEnEstado(t *testing.T, db *gorm.DB, estado string) uuid.UUID {
+	t.Helper()
 	pedidoID := uuid.New()
 	err := db.Exec(
-		`INSERT INTO pedido (id, estado_pedido, estado_pago, medio_pago, total_centavos) VALUES (?, 'PENDIENTE_DE_PAGO', 'PENDIENTE', 'MERCADO_PAGO', 150000)`,
-		pedidoID,
+		`INSERT INTO pedido (id, estado_pedido, estado_pago, medio_pago, total_centavos, token_acceso) VALUES (?, ?, 'PENDIENTE', 'MERCADO_PAGO', 150000, ?)`,
+		pedidoID, estado, uuid.NewString(),
 	).Error
 	if err != nil {
 		t.Fatalf("crear pedido de prueba: %v", err)
@@ -142,4 +152,45 @@ func TestProcesarNotificacionEsIdempotente(t *testing.T) {
 		db.Exec("DELETE FROM detalle_pedido WHERE pedido_id = ?", pedidoID)
 		db.Exec("DELETE FROM pedido WHERE id = ?", pedidoID)
 	})
+}
+
+// Un pago aprobado que no corresponde (monto distinto, o pedido que ya no
+// espera el pago) queda registrado, pero no confirma el pedido.
+func TestProcesarNotificacionNoConfirmaLoQueNoCorresponde(t *testing.T) {
+	db := conectarParaTest(t)
+	stock := usecases.NuevoServicioStock(db)
+	intentos := repo.NuevoRepositorioIntentos(db)
+	ctx := context.Background()
+
+	casos := []struct {
+		nombre, estadoPedido string
+		monto                int64
+		estadoFinal          string
+	}{
+		{"cobrado sin el envío", "PENDIENTE_DE_PAGO", 100000, "PENDIENTE_DE_PAGO"},
+		{"llega con el pedido vencido", "CANCELADO", 150000, "CANCELADO"},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			pedidoID := crearPedidoEnEstado(t, db, c.estadoPedido)
+			t.Cleanup(func() {
+				db.Exec("DELETE FROM intento_pago WHERE pedido_id = ?", pedidoID)
+				db.Exec("DELETE FROM pedido WHERE id = ?", pedidoID)
+			})
+			pago := mp.Pago{ID: "pago-" + uuid.NewString(), Estado: "approved", MontoCentavos: c.monto, ReferenciaExterna: pedidoID.String()}
+
+			if err := procesarNotificacion(ctx, db, stock, intentos, pedidoID, pago); err != nil {
+				t.Fatalf("procesarNotificacion: error = %v", err)
+			}
+
+			var estadoPedido, estadoPago string
+			if err := db.Raw("SELECT estado_pedido, estado_pago FROM pedido WHERE id = ?", pedidoID).
+				Row().Scan(&estadoPedido, &estadoPago); err != nil {
+				t.Fatalf("leer pedido: %v", err)
+			}
+			if estadoPedido != c.estadoFinal || estadoPago != "PENDIENTE" {
+				t.Fatalf("pedido = (%s, %s), esperado (%s, PENDIENTE)", estadoPedido, estadoPago, c.estadoFinal)
+			}
+		})
+	}
 }
