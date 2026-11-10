@@ -136,3 +136,42 @@ func TestDecidirConfirmacion(t *testing.T) {
 		})
 	}
 }
+
+// Propuesta del Issue #14: la preferencia vence junto con la reserva.
+func TestVencimientoDePreferencia(t *testing.T) {
+	p := pedidoPendiente(nil)
+	vence, ok := VencimientoDePreferencia(p)
+	if !ok || !vence.Equal(*p.VenceEn) {
+		t.Fatalf("VencimientoDePreferencia = (%v, %v), esperado (%v, true)", vence, ok, *p.VenceEn)
+	}
+
+	p.MedioPago, p.VenceEn = domain.PagoEfectivo, nil
+	if _, ok := VencimientoDePreferencia(p); ok {
+		t.Fatal("un pedido sin vence_en (efectivo) no lleva plazo de preferencia")
+	}
+}
+
+// Propuesta del Issue #14: qué hace el vencimiento según los pagos que
+// informa Mercado Pago.
+func TestDecidirAlVencer(t *testing.T) {
+	casos := []struct {
+		nombre   string
+		estados  []string
+		esperado AccionAlVencer
+	}{
+		{"sin pagos: se cancela", nil, Cancelar},
+		{"solo rechazados: se cancela", []string{"rejected", "cancelled"}, Cancelar},
+		{"reintegrado: se cancela", []string{"refunded"}, Cancelar},
+		{"en proceso: se espera", []string{"in_process"}, Esperar},
+		{"pendiente después de un rechazo: se espera", []string{"rejected", "pending"}, Esperar},
+		{"aprobado sin webhook: se concilia", []string{"approved"}, ConciliarAprobado},
+		{"aprobado manda sobre un pendiente", []string{"pending", "approved"}, ConciliarAprobado},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			if got := DecidirAlVencer(c.estados); got != c.esperado {
+				t.Fatalf("DecidirAlVencer(%v) = %v, esperado %v", c.estados, got, c.esperado)
+			}
+		})
+	}
+}

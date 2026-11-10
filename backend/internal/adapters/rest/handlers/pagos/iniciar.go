@@ -26,7 +26,7 @@ const headerTokenAcceso = "X-Token-Acceso"
 //  1. ¿es del comprador?          sesión del dueño o header X-Token-Acceso; si no, 404.
 //  2. ¿sigue esperando el pago?   medio, estado y reserva vigente; si no, 409.
 //  3. ¿hay otro pago en curso?    se le pregunta a Mercado Pago; si hay, 409.
-//  4. abrir la preferencia        con las líneas y el envío: el total del pedido.
+//  4. abrir la preferencia        con las líneas y el envío; vence con la reserva (#14).
 func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 	pedidoID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -72,10 +72,14 @@ func (h *handler) iniciarPago(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respuesta, err := h.mp.CrearPreferencia(ctx, mp.Preferencia{
+	preferencia := mp.Preferencia{
 		PedidoID: pedidoID.String(),
 		Items:    itemsDePreferencia(lineas, pedido.EnvioCentavos),
-	})
+	}
+	if vence, ok := reglas.VencimientoDePreferencia(pedido); ok {
+		preferencia.VenceEn = &vence
+	}
+	respuesta, err := h.mp.CrearPreferencia(ctx, preferencia)
 	if err != nil {
 		apierr.Responder(w, endpointIniciarPago, err)
 		return
