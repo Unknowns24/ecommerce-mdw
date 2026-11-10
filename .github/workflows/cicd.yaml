@@ -1,4 +1,4 @@
-name: CI/CD backend
+name: CI/CD
 
 on:
   push:
@@ -28,6 +28,34 @@ jobs:
       - name: gofmt
         working-directory: backend
         run: test -z "$(gofmt -l .)"
+
+  verificar-frontend:
+    name: Verificar frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci
+        run: npm ci
+      - name: lint
+        run: npm run lint
+      # Next 16 genera los tipos globales de las rutas (LayoutProps,
+      # PageProps) en .next/types: sin este paso, tsc falla en un checkout
+      # limpio. Cuando la base agregue el script typecheck, estos dos pasos
+      # pasan a ser `npm run typecheck`.
+      - name: tipos de las rutas
+        run: npx next typegen
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: build
+        run: npm run build
 
   publicar-imagen:
     name: Publicar imagen del backend en GHCR
