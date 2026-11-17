@@ -83,7 +83,7 @@ func nuevoEscenarioAdmin(sesion bool, pedidos ...*domain.Pedido) *escenarioAdmin
 	stock := &gestorStockFalso{}
 	gestion := uc.NuevaGestion(g, stock, txFalsa{}, time.Now)
 
-	h := NuevoHandler(nil, nil, gestion, nil)
+	h := NuevoHandler(nil, nil, gestion, nil, nil)
 	admin := uuid.New()
 	h.usuario = func(context.Context) (middleware.Usuario, bool) {
 		return middleware.Usuario{ID: admin}, sesion

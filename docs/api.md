@@ -93,7 +93,7 @@ Una variante inactiva no aparece en `/api/catalogo/variantes` y `/api/catalogo/v
 | POST          | `/api/admin/pedidos/{id}/cobro-efectivo`      | `pedidos.gestionar`            | 401        | 403         | —     | H15, H17 |
 | POST          | `/api/admin/pedidos/{id}/cancelacion`         | `pedidos.gestionar`            | 401        | 403         | —     | H18      |
 
-`GET /api/tienda/configuracion` **todavía no existe** (lo agrega Nicolás, `docs/tareas/nicolas.md`): devuelve `efectivoHabilitado`, `distanciaMaximaMetros` y las tarifas `{desdeMetros, hastaMetros, costoCentavos}`, para que el checkout ofrezca efectivo solo si está habilitado y anticipe el costo de envío (H13). El costo que vale es el que calcula `POST /api/pedidos`.
+`GET /api/tienda/configuracion` es público (no pide sesión) y devuelve `efectivoHabilitado`, `distanciaMaximaMetros` y las tarifas `{desdeMetros, hastaMetros, costoCentavos}`, para que el checkout ofrezca efectivo solo si está habilitado y anticipe el costo de envío (H13). El costo que vale es el que calcula `POST /api/pedidos`. Si la tienda todavía no cargó ninguna configuración responde 404, y el checkout lo lee como «el envío no está disponible».
 
 En `POST /api/pedidos`, la identidad sale de la sesión si la hay y el precio sale del catálogo, nunca del cuerpo: un cuerpo que mande precio o usuario no cambia el resultado.
 
