@@ -22,14 +22,16 @@ import (
 // it exactly once. Quién puede llamar a cada ruta está en docs/api.md.
 func Montar(r chi.Router, db *gorm.DB, cfg config.Config, mw *middleware.Middleware) {
 	pedidos := repo.NuevoRepositorioPedidos(db)
+	configuracion := repo.NuevoRepositorioConfiguracion(db)
 	stock := inventario.NuevoServicioStock(db)
 	lector := lectorCatalogo{catalogo.NuevoLector(db)}
 
 	h := NuevoHandler(
-		uc.NuevoCheckout(lector, reservadorStock{stock}, pedidos, repo.NuevoRepositorioConfiguracion(db), repo.NuevasTransacciones(db), cfg.PaymentReservationTTL, time.Now),
+		uc.NuevoCheckout(lector, reservadorStock{stock}, pedidos, configuracion, repo.NuevasTransacciones(db), cfg.PaymentReservationTTL, time.Now),
 		uc.NuevaConsulta(pedidos),
 		uc.NuevaGestion(pedidos, stock, repo.NuevasTransacciones(db), time.Now),
 		uc.NuevaGestionCarrito(repo.NuevoRepositorioCarritos(db), lector, stock),
+		uc.NuevaConfiguracion(configuracion),
 	)
 
 	conSesion := r.With(mw.RequiereSesion)
@@ -43,6 +45,8 @@ func Montar(r chi.Router, db *gorm.DB, cfg config.Config, mw *middleware.Middlew
 	conSesion.Get("/api/pedidos", h.ListarMisPedidos)
 	conSesion.Get("/api/pedidos/{id}", h.ObtenerPedido)
 	r.Get("/api/pedidos/publico/{token}", h.ObtenerPedidoPublico) // público a propósito: el token es la credencial del invitado
+
+	r.Get("/api/tienda/configuracion", h.ObtenerConfiguracionTienda) // público a propósito: son datos comerciales que el checkout necesita antes de que haya sesión
 
 	admin := r.With(mw.RequiereSesion, mw.RequierePermiso("pedidos.gestionar"))
 	admin.Get("/api/admin/pedidos", h.ListarPedidosAdmin)

@@ -309,6 +309,10 @@ GET {{base}}/api/pedidos/publico/token-invalido
 ### Enlace privado con un token que no existe → 404
 GET {{base}}/api/pedidos/publico/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
+### Configuración de la tienda (pública, sin sesión) → 200 { efectivoHabilitado, distanciaMaximaMetros, tarifas: [{ desdeMetros, hastaMetros, costoCentavos }] }
+# Sin ninguna configuración cargada responde 404 (el checkout lo lee como "el envío no está disponible").
+GET {{base}}/api/tienda/configuracion
+
 
 # =============================================================================
 # 5. CARRITO DEL CLIENTE REGISTRADO  (el del invitado vive en el navegador)

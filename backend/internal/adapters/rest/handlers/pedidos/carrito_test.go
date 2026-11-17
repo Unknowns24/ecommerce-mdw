@@ -105,7 +105,7 @@ func nuevoEscenarioCarritoHTTP() *escenarioCarritoHTTP {
 	cat := catalogoFalso{map[uuid.UUID]out.VarianteVendible{perfume.ID: perfume}}
 	gestion := uc.NuevaGestionCarrito(&repoCarritoFalso{carritos: map[uuid.UUID]*domain.Carrito{}}, cat, disponibleFalso{perfume.ID: 5})
 
-	h := NuevoHandler(nil, nil, nil, gestion)
+	h := NuevoHandler(nil, nil, nil, gestion, nil)
 	r := chi.NewRouter()
 	r.Get("/api/carrito", h.VerCarrito)
 	r.Delete("/api/carrito", h.VaciarCarrito)

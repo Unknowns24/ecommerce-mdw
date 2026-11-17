@@ -74,7 +74,7 @@ func armar(disponible int) (*Handler, uuid.UUID) {
 	v := out.VarianteVendible{ID: id, Codigo: "PERF-01", Nombre: "Perfume", PrecioMinoristaCentavos: precioReal, Activa: true}
 	co := uc.NuevoCheckout(catalogoFalso{map[uuid.UUID]out.VarianteVendible{id: v}}, stockFalso{disponible}, repoFalso{}, configFalsa{}, txFalsa{},
 		15*time.Minute, time.Now)
-	return NuevoHandler(co, nil, nil, nil), id
+	return NuevoHandler(co, nil, nil, nil, nil), id
 }
 
 func post(h *Handler, cuerpo string) *httptest.ResponseRecorder {
