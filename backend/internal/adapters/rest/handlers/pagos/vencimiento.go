@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/Unknowns24/ecommerce-mdw/config"
+	repo "github.com/Unknowns24/ecommerce-mdw/internal/adapters/db/postgresql/repositories/pagos"
 	"github.com/Unknowns24/ecommerce-mdw/internal/adapters/external/mp"
 	usecases "github.com/Unknowns24/ecommerce-mdw/internal/usecases/inventario"
 	reglas "github.com/Unknowns24/ecommerce-mdw/internal/usecases/pagos"
@@ -23,7 +24,7 @@ const (
 // consultaPagos es lo que el vencimiento necesita de Mercado Pago. Es una
 // interfaz para que la prueba no salga a la red.
 type consultaPagos interface {
-	EstadosDePagosDelPedido(ctx context.Context, pedidoID string) ([]string, error)
+	PagosDelPedido(ctx context.Context, pedidoID string) ([]mp.Pago, error)
 }
 
 // IniciarVencimiento cancela, cada minuto, los pedidos de Mercado Pago cuya
@@ -52,9 +53,13 @@ func IniciarVencimiento(ctx context.Context, db *gorm.DB, cfg config.Config) {
 
 // vencerPendientes cancela los pedidos vencidos y devuelve cuántos canceló.
 // Un temporizador local no basta para asumir que no hubo pago (spec, sección
-// 6): antes de cancelar se le pregunta a Mercado Pago, y si hay un pago que
-// todavía puede acreditarse —o el proveedor no responde— el pedido se deja
-// para la próxima vuelta.
+// 6): antes de cancelar se le pregunta a Mercado Pago (DecidirAlVencer).
+//   - Un pago aprobado cuyo webhook no llegó se concilia por el mismo camino
+//     que el webhook (procesarNotificacion → DecidirConfirmacion): se confirma
+//     si el pedido sigue pendiente y se acreditó su total; si no, queda la
+//     incidencia y el pedido no se cancela. Propuesta del Issue #14.
+//   - Un pago que todavía puede acreditarse, o un proveedor que no responde,
+//     dejan el pedido para la próxima vuelta.
 func vencerPendientes(ctx context.Context, db *gorm.DB, stock *usecases.ServicioStock, pagos consultaPagos, ahora time.Time) (int, error) {
 	var ids []uuid.UUID
 	err := db.WithContext(ctx).Table("pedido").
@@ -65,14 +70,26 @@ func vencerPendientes(ctx context.Context, db *gorm.DB, stock *usecases.Servicio
 		return 0, err
 	}
 
+	intentos := repo.NuevoRepositorioIntentos(db)
 	cancelados := 0
 	for _, id := range ids {
-		estados, err := pagos.EstadosDePagosDelPedido(ctx, id.String())
+		pagosMP, err := pagos.PagosDelPedido(ctx, id.String())
 		if err != nil {
 			log.Printf("vencimiento: no se pudo consultar Mercado Pago para el pedido %s, se reintenta: %v", id, err)
 			continue
 		}
-		if reglas.HayPagoActivo(estados) {
+		switch reglas.DecidirAlVencer(mp.EstadosDe(pagosMP)) {
+		case reglas.Esperar:
+			continue
+		case reglas.ConciliarAprobado:
+			for _, pago := range pagosMP {
+				if pago.Estado != "approved" {
+					continue
+				}
+				if err := procesarNotificacion(ctx, db, stock, intentos, id, pago); err != nil {
+					log.Printf("vencimiento: conciliar el pago %s del pedido %s: %v", pago.ID, id, err)
+				}
+			}
 			continue
 		}
 

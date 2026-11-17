@@ -465,6 +465,7 @@ Los estados del pedido, del pago y de la factura se distinguen. «Confirmado» n
 - Productos, cantidades, precios, descuentos, comprador y domicilio del pedido se conservan como copia histórica. Correcciones operativas no alteran silenciosamente lo comprado.
 - La misma notificación o acción repetida no duplica pedidos, cobros registrados, movimientos, usos de cupón ni solicitudes fiscales.
 - **Pendiente crítico de integración:** medios MP admitidos, vigencia de la operación externa, consulta al vencer y notificaciones tardías. Una preferencia vencida o un temporizador local no bastan para asumir ausencia de pago.
+  - **Propuesta en el Issue #14** (sin decidir; sigue Pendiente): la preferencia vence junto con la reserva (`expiration_date_to = vence_en`), y al vencer, si Mercado Pago informa un pago aprobado sin webhook, se aplica la misma regla que en el webhook: se confirma solo si el pedido sigue pendiente y se acreditó su total; si no, se registra una incidencia. Los medios admitidos no forman parte de la propuesta.
 - **Propuesta de contingencia:** si llega una aprobación después de liberar unidades, detener la confirmación automática y registrar una incidencia. Verificar disponibilidad y resolver de forma controlada; si no puede cumplirse, tramitar cancelación/reintegro externo. El pedido nunca se completa con stock negativo ni se informa reembolsado sin intervención administrativa.
 
 ### Cancelaciones y auditoría
