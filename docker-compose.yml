@@ -1,4 +1,13 @@
 services:
+  migrate:
+    build: ./backend
+    env_file: ./backend/.env
+    command: ["migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build: ./backend
     env_file: ./backend/.env
@@ -7,6 +16,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   db:

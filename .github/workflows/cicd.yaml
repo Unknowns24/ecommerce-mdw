@@ -1,4 +1,4 @@
-name: CI/CD backend
+name: CI/CD backend y frontend
 
 on:
   push:
@@ -28,6 +28,28 @@ jobs:
       - name: gofmt
         working-directory: backend
         run: test -z "$(gofmt -l .)"
+
+  verificar-frontend:
+    name: Verificar frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
 
   publicar-imagen:
     name: Publicar imagen del backend en GHCR
@@ -102,3 +124,74 @@ jobs:
             ${{ steps.images.outputs.production }}:latest
           cache-from: type=gha,scope=backend-production
           cache-to: type=gha,mode=max,scope=backend-production
+
+  publicar-imagen-frontend:
+    name: Publicar imagen del frontend en GHCR
+    needs: verificar-frontend
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/main' ||
+      startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Iniciar sesión en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker exige nombres de repositorio en minúsculas. GITHUB_REPOSITORY
+      # conserva las mayúsculas del owner, por eso se normaliza acá.
+      - name: Resolver nombres de las imágenes
+        id: images
+        shell: bash
+        run: |
+          echo "staging=ghcr.io/${GITHUB_REPOSITORY,,}/frontend-staging" >> "$GITHUB_OUTPUT"
+          echo "production=ghcr.io/${GITHUB_REPOSITORY,,}/frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Build y push del frontend (staging)
+        if: github.ref == 'refs/heads/develop'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.images.outputs.staging }}:v0.0.0-rc.${{ github.run_number }}
+            ${{ steps.images.outputs.staging }}:${{ github.sha }}
+            ${{ steps.images.outputs.staging }}:latest
+          cache-from: type=gha,scope=frontend-staging
+          cache-to: type=gha,mode=max,scope=frontend-staging
+
+      - name: Build y push del frontend (main)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.images.outputs.production }}:${{ github.sha }}
+            ${{ steps.images.outputs.production }}:latest
+          cache-from: type=gha,scope=frontend-production
+          cache-to: type=gha,mode=max,scope=frontend-production
+
+      - name: Build y push del frontend (release)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.images.outputs.production }}:${{ github.ref_name }}
+            ${{ steps.images.outputs.production }}:${{ github.sha }}
+            ${{ steps.images.outputs.production }}:latest
+          cache-from: type=gha,scope=frontend-production
+          cache-to: type=gha,mode=max,scope=frontend-production
