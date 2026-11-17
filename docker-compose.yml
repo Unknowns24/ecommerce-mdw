@@ -2,6 +2,15 @@
 # en GHCR (ADR-005). En local, `docker compose up -d --build` las construye
 # desde el código y les pone ese mismo nombre.
 services:
+  migrate:
+    build: ./backend
+    env_file: ./backend/.env
+    command: ["migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   api:
     image: ghcr.io/unknowns24/ecommerce-mdw/backend:latest
     build: ./backend
@@ -11,6 +20,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # Frontend en Next.js (ADR-007). Llama a la API por la red interna de
