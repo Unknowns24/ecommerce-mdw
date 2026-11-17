@@ -25,6 +25,9 @@ Las decisiones aceptadas se mantienen como ADR:
 - [ADR-004: dinero en centavos (`int64`) e identificadores `uuid.UUID`](docs/adr/ADR-004-tipos-de-datos.md)
 - [ADR-005: despliegue en VPS propia, no en Vercel](docs/adr/ADR-005-despliegue.md)
 - [ADR-006: login propio y JWT con permisos adentro](docs/adr/ADR-006-sesion.md)
+- [ADR-007 (propuesto): frontend en Next.js que consume la API desde el servidor](docs/adr/ADR-007-frontend-y-consumo-de-la-api.md)
+
+Quién puede llamar a cada endpoint está en [el contrato de la API](docs/api.md); las reglas para escribir código (y para el asistente de IA), en [`AGENTS.md`](AGENTS.md); el reparto del trabajo hasta el Parcial II, en [el plan de trabajo](docs/plan-de-trabajo.md), con las tareas de cada integrante en [`docs/tareas/`](docs/tareas/README.md) y el contrato que les permite trabajar en paralelo en [`docs/contratos-frontend.md`](docs/contratos-frontend.md).
 
 Las propuestas futuras y asuntos abiertos están separados como [RFC](docs/rfc/README.md). Un RFC no habilita código productivo hasta contar con una decisión aceptada.
 
@@ -36,26 +39,26 @@ backend/          API en Go
   cmd/            puntos de entrada y comandos operativos (api, seed)
   internal/       casos de uso, dominio y adaptadores privados
   Dockerfile      build multi-stage, usuario no root
-deploy/
-  nginx/          referencia del reverse proxy con TLS para la VPS
 docs/
   specs.md        especificación funcional
   adr/            decisiones de arquitectura aceptadas
   rfc/            propuestas y decisiones pendientes
   api/            requests .http de prueba, por módulo
 docker-compose.yml  servicio api + Postgres 16 con volumen persistente
-.github/workflows/  CI (build/vet/test/gofmt) y CD (deploy por SSH a main)
+.github/workflows/  CI (build/vet/test/gofmt) y publicación de la imagen del backend en GHCR
 frontend/         tienda y panel en Next.js
 ```
 
 ## Producción
 
-**URL pública:** _pendiente — todavía no hay despliegue real en una VPS._ Cuando exista, va acá y no cambia en todo el cuatrimestre (ver [ADR-005](docs/adr/ADR-005-despliegue.md)). Hasta entonces, `docs/api/*.http` sólo corre contra `http://localhost:8080`.
+**URL pública:** https://mdw.unkcode.com
 
 ```bash
-curl https://<la-url-pública>/api/salud
+curl https://mdw.unkcode.com/api/salud
 # {"estado":"ok","version":"<git-sha-corto>"}
 ```
+
+**Cómo llega una versión a producción** ([ADR-005](docs/adr/ADR-005-despliegue.md#actualización--2026-11-05)): `.github/workflows/cicd.yaml` corre `verificar` en cada push y cada PR; si pasa, `publicar-imagen` sube la imagen a GHCR: `backend-staging` desde `develop` y `backend` desde `main` y desde los tags `v*`. En la VPS, Watchtower detecta el `backend:latest` nuevo y reinicia el contenedor `api`. Las migraciones no corren solas: se aplican a mano en la VPS con `docker compose run --rm api migrate`.
 
 ## Backend
 
@@ -77,7 +80,7 @@ Con Docker, además del backend hace falta levantar Postgres:
 cp .env.example .env               # POSTGRES_USER / PASSWORD / DB del contenedor db
 cp backend/.env.example backend/.env
 docker compose up -d --build
-docker compose run --rm api /api migrate
+docker compose run --rm api migrate
 ```
 
 ### Datos de prueba
