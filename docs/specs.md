@@ -468,12 +468,15 @@ Los estados del pedido, del pago y de la factura se distinguen. «Confirmado» n
   - **Propuesta en el Issue #14** (sin decidir; sigue Pendiente): la preferencia vence junto con la reserva (`expiration_date_to = vence_en`), y al vencer, si Mercado Pago informa un pago aprobado sin webhook, se aplica la misma regla que en el webhook: se confirma solo si el pedido sigue pendiente y se acreditó su total; si no, se registra una incidencia. Los medios admitidos no forman parte de la propuesta.
 - **Propuesta de contingencia:** si llega una aprobación después de liberar unidades, detener la confirmación automática y registrar una incidencia. Verificar disponibilidad y resolver de forma controlada; si no puede cumplirse, tramitar cancelación/reintegro externo. El pedido nunca se completa con stock negativo ni se informa reembolsado sin intervención administrativa.
 
+**Decisión de resolución de incidencias de pago (2026-11-17):** los pagos aprobados por un monto distinto o recibidos cuando el pedido ya no está pendiente generan una incidencia persistente, idempotente por pedido, pago y motivo. Se muestran en el detalle existente `/admin/pedidos/[id]`, con un aviso en el listado administrativo. Quien tiene `pedidos.gestionar` puede cerrarla manualmente con nota obligatoria de hasta 1000 caracteres; se conservan responsable, fecha y nota. Repetir el cierre conserva la primera resolución. Cerrar una incidencia no cambia el pedido, el pago ni el stock y no ejecuta reintegros: cualquier devolución se realiza fuera del sistema. Las revisiones periódicas rotan los pedidos para que los casos pendientes no bloqueen la conciliación de los demás.
+
 ### Cancelaciones y auditoría
 
 - El comprador solicita cancelar por WhatsApp; solo la administración con permiso persiste la decisión.
 - Para un pedido pagado, cancelar implica declarar reintegro efectuado fuera del sistema. La interfaz debe explicitarlo; no se llama a MP para devolver dinero.
 - **Propuesta para revisión:** exigir motivo y confirmación explícita de reintegro; no permitir cancelación ordinaria después del despacho o entrega hasta definir recuperación física y tratamiento fiscal. Este límite sigue pendiente de aceptación del equipo.
 - No se reponen unidades entregadas automáticamente por el mero cambio a cancelado. La restitución usa los lotes realmente afectados y es idempotente.
+
 - Se auditan cambios con actor humano o sistema, fecha, acción y datos anteriores/nuevos. La declaración de reembolso queda distinguida de un reintegro verificado por un proveedor.
 - Cancelar no elimina la factura; el tratamiento documental de la cancelación corresponde a la integración fiscal pendiente.
 

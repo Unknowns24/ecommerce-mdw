@@ -1,7 +1,9 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
-import { WEB_URL } from "./entorno";
-import { tokenDe, type NombreCuenta } from "./sesiones";
+import { API_URL, env, exigirBaseLocal, WEB_URL } from "./entorno";
+import { sesion, tokenDe, type NombreCuenta } from "./sesiones";
 
 // El flujo principal (spec, sección 5), un test.step por fila del mapa de
 // pantallas, buscando como una persona: por rol, etiqueta y texto. Sigue la
@@ -166,4 +168,58 @@ test("compra con Mercado Pago hasta la redirección al init_point", async ({ pag
     await page.getByRole("button", { name: "Confirmar pedido" }).click();
     await page.waitForURL(/mercadopago\./, { timeout: 30_000 });
   });
+});
+
+test("el panel abre la edición de un producto con variantes", async ({ browser }) => {
+  const admin = await conSesion(browser, "dueno");
+  try {
+    await admin.goto("/admin/productos");
+    await admin.getByRole("link", { name: "Love Spell", exact: true }).click();
+    await expect(admin.getByLabel("Nombre", { exact: true }).first()).toHaveValue("Love Spell");
+    await expect(admin.getByRole("button", { name: "Guardar producto", exact: true })).toBeVisible();
+  } finally {
+    await admin.context().close();
+  }
+});
+
+test("la administración resuelve una incidencia con nota sin alterar el pedido", async ({ browser, request }) => {
+  exigirBaseLocal(env.DATABASE_DSN);
+  const r = await request.post(`${API_URL}/api/pedidos`, { data: {
+    items: [{ varianteId: "11111111-1111-1111-1111-111111111111", unidades: 1 }],
+    comprador: { nombre: "Ana", apellido: "Pérez", correo: "ana@e2e.test", telefono: "3415550000", dni: "30111222" },
+    modoEntrega: "RETIRO", medioPago: "MERCADO_PAGO",
+  } });
+  expect(r.status()).toBe(201);
+  const pedido = await r.json() as { id: string; totalCentavos: number };
+  expect(pedido.id).toMatch(/^[0-9a-f-]{36}$/);
+  const incidencia = randomUUID();
+  // Fixture externa, sin puertas ni modo prueba en la aplicación.
+  execFileSync("psql", [env.DATABASE_DSN, "-v", "ON_ERROR_STOP=1", "-c",
+    `INSERT INTO incidencia_pago (id,pedido_id,referencia_externa,motivo,monto_centavos,total_pedido_centavos) VALUES ('${incidencia}','${pedido.id}','cobro-e2e','MONTO_DISTINTO',100,${pedido.totalCentavos})`,
+  ]);
+  const ruta = `${API_URL}/api/admin/pedidos/${pedido.id}/incidencias`;
+  expect((await request.post(`${API_URL}/api/admin/pedidos/99999999-9999-9999-9999-999999999999/incidencias/${incidencia}/resolucion`, {
+    headers: sesion("dueno"), data: { nota: "Verificado" },
+  })).status()).toBe(404);
+  const admin = await conSesion(browser, "dueno");
+  try {
+    await admin.goto("/admin/pedidos");
+    await expect(admin.getByText("1 incidencia pendiente", { exact: true })).toBeVisible();
+    await admin.goto(`/admin/pedidos/${pedido.id}`);
+    await expect(admin.getByRole("heading", { name: "Incidencias de pago" })).toBeVisible();
+    await admin.getByRole("button", { name: "Registrar resolución" }).click();
+    await expect(admin.getByLabel("Cómo se resolvió la incidencia")).toHaveAttribute("aria-invalid", "true");
+    const nota = "Se verificó el cobro y se reintegró manualmente en Mercado Pago.";
+    await admin.getByLabel("Cómo se resolvió la incidencia").fill(nota);
+    await admin.getByRole("button", { name: "Registrar resolución" }).click();
+    await expect(admin.getByText(nota, { exact: true })).toBeVisible();
+    await expect(admin.getByText(/Resuelta por Dueña Prueba/)).toBeVisible();
+    const items = await (await request.get(ruta, { headers: sesion("dueno") })).json();
+    expect(items[0].notaResolucion).toBe(nota);
+    const actual = await (await request.get(`${API_URL}/api/admin/pedidos/${pedido.id}`, { headers: sesion("dueno") })).json();
+    expect(actual.estadoPedido).toBe("PENDIENTE_DE_PAGO");
+    expect(actual.estadoPago).toBe("PENDIENTE");
+    await admin.goto("/admin/pedidos");
+    await expect(admin.getByText("1 incidencia pendiente", { exact: true })).toHaveCount(0);
+  } finally { await admin.context().close(); }
 });

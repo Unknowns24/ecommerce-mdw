@@ -126,6 +126,7 @@ export default async function PedidosPanel({ searchParams }: PageProps<"/admin/p
                       <Link href={`/admin/pedidos/${p.id}`} className="font-medium underline underline-offset-4">
                         Pedido #{p.numero}
                       </Link>
+                      {p.incidenciasPendientes > 0 ? <p className="text-sm text-destructive">{p.incidenciasPendientes} {p.incidenciasPendientes === 1 ? "incidencia pendiente" : "incidencias pendientes"}</p> : null}
                     </TableCell>
                     <TableCell>{formatearFecha(p.creadoEn)}</TableCell>
                     <TableCell>

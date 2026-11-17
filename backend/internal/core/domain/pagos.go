@@ -38,3 +38,21 @@ type IntentoPago struct {
 }
 
 func (IntentoPago) TableName() string { return "intento_pago" }
+
+// IncidenciaPago conserva un cobro que requiere intervención humana.
+// Resolverla registra una decisión; no modifica el cobro ni el stock.
+type IncidenciaPago struct {
+	ID                  uuid.UUID  `gorm:"column:id;primaryKey"`
+	PedidoID            uuid.UUID  `gorm:"column:pedido_id"`
+	ReferenciaExterna   string     `gorm:"column:referencia_externa"`
+	Motivo              string     `gorm:"column:motivo"`
+	MontoCentavos       int64      `gorm:"column:monto_centavos"`
+	TotalPedidoCentavos int64      `gorm:"column:total_pedido_centavos"`
+	CreadoEn            time.Time  `gorm:"column:creado_en"`
+	ResueltoPor         *uuid.UUID `gorm:"column:resuelto_por"`
+	ResueltoEn          *time.Time `gorm:"column:resuelto_en"`
+	NotaResolucion      *string    `gorm:"column:nota_resolucion"`
+	ResueltoPorNombre   string     `gorm:"->;column:resuelto_por_nombre;-:migration"`
+}
+
+func (IncidenciaPago) TableName() string { return "incidencia_pago" }

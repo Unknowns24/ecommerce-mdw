@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { obtenerPedido } from "@/features/backoffice/api";
+import { obtenerPedido, resolverIncidencia } from "@/features/backoffice/api";
 import { requerirPermiso } from "@/features/identidad/sesion";
 import { traducirError, valoresDe, type EstadoFormulario } from "@/lib/acciones";
 import { api } from "@/lib/api";
@@ -38,6 +38,18 @@ export async function entregarAction(id: string): Promise<EstadoFormulario> {
 
 export async function completarEfectivoAction(id: string): Promise<EstadoFormulario> {
   return transicion(id, "cobro-efectivo");
+}
+
+export async function resolverIncidenciaAction(pedidoId: string, incidenciaId: string, _prev: EstadoFormulario, formData: FormData): Promise<EstadoFormulario> {
+  await requerirPermiso("pedidos.gestionar");
+  const valores = valoresDe(formData);
+  try {
+    await resolverIncidencia(pedidoId, incidenciaId, valores.nota ?? "");
+  } catch (e) {
+    return traducirError(e, valores);
+  }
+  refrescar(pedidoId);
+  redirect(`/admin/pedidos/${pedidoId}`);
 }
 
 // Cancelar exige motivo (lo valida la API). Si el pedido estaba pagado,

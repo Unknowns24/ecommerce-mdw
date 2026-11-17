@@ -61,11 +61,8 @@ func IniciarVencimiento(ctx context.Context, db *gorm.DB, cfg config.Config) {
 //   - Un pago que todavía puede acreditarse, o un proveedor que no responde,
 //     dejan el pedido para la próxima vuelta.
 func vencerPendientes(ctx context.Context, db *gorm.DB, stock *usecases.ServicioStock, pagos consultaPagos, ahora time.Time) (int, error) {
-	var ids []uuid.UUID
-	err := db.WithContext(ctx).Table("pedido").
-		Where("medio_pago = 'MERCADO_PAGO' AND estado_pedido = 'PENDIENTE_DE_PAGO' AND vence_en <= ?", ahora).
-		Order("vence_en").Limit(loteVencimiento).
-		Pluck("id", &ids).Error
+	revisiones := repo.NuevoRepositorioIncidencias(db)
+	ids, err := revisiones.PendientesVencidos(ctx, ahora, loteVencimiento)
 	if err != nil {
 		return 0, err
 	}
@@ -73,6 +70,10 @@ func vencerPendientes(ctx context.Context, db *gorm.DB, stock *usecases.Servicio
 	intentos := repo.NuevoRepositorioIntentos(db)
 	cancelados := 0
 	for _, id := range ids {
+		// Incluso una falla del proveedor cede el turno a los demás pedidos.
+		if err := revisiones.RegistrarRevision(ctx, id, ahora); err != nil {
+			return cancelados, err
+		}
 		pagosMP, err := pagos.PagosDelPedido(ctx, id.String())
 		if err != nil {
 			log.Printf("vencimiento: no se pudo consultar Mercado Pago para el pedido %s, se reintenta: %v", id, err)

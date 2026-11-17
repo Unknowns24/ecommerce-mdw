@@ -135,6 +135,14 @@ func Load() (Config, error) {
 	if strings.TrimSpace(cfg.PublicBaseURL) == "" {
 		return Config{}, fmt.Errorf("PUBLIC_BASE_URL is required")
 	}
+	if cfg.Environment == "production" {
+		if strings.TrimSpace(cfg.MercadoPagoAccessToken) == "" {
+			return Config{}, fmt.Errorf("MERCADOPAGO_ACCESS_TOKEN is required in production")
+		}
+		if strings.TrimSpace(cfg.MercadoPagoWebhookSecret) == "" {
+			return Config{}, fmt.Errorf("MERCADOPAGO_WEBHOOK_SECRET is required in production")
+		}
+	}
 
 	return cfg, nil
 }
