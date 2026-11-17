@@ -34,7 +34,7 @@ func (s *ServicioVariantes) Crear(ctx context.Context, in dto.CrearVariante) (do
 		return domain.Variante{}, apierr.ErrValidacion{Campos: map[string]string{"productoId": "producto activo inexistente"}}
 	}
 	now := time.Now().UTC()
-	v := domain.Variante{ID: uuid.New(), ProductoID: in.ProductoID, Codigo: strings.TrimSpace(in.Codigo), Nombre: strings.TrimSpace(in.Nombre), Descripcion: in.Descripcion, PrecioMinoristaCentavos: in.PrecioMinoristaCentavos, PrecioMayoristaCentavos: in.PrecioMayoristaCentavos, Estado: "ACTIVA", CreadoEn: now, ActualizadoEn: now}
+	v := domain.Variante{ID: uuid.New(), ProductoID: in.ProductoID, Codigo: strings.TrimSpace(in.Codigo), Nombre: strings.TrimSpace(in.Nombre), Descripcion: in.Descripcion, PrecioMinoristaCentavos: in.PrecioMinoristaCentavos, PrecioMayoristaCentavos: in.PrecioMayoristaCentavos, Estado: estadoVarianteActiva, CreadoEn: now, ActualizadoEn: now}
 	if err := s.repo.Crear(ctx, &v); err != nil {
 		return domain.Variante{}, conflictoCodigo(err)
 	}
@@ -87,7 +87,7 @@ func (s *ServicioVariantes) Editar(ctx context.Context, id uuid.UUID, in dto.Edi
 }
 
 func (s *ServicioVariantes) Desactivar(ctx context.Context, id uuid.UUID) error {
-	return s.repo.CambiarEstado(ctx, id, "INACTIVA")
+	return s.repo.CambiarEstado(ctx, id, estadoVarianteInactiva)
 }
 
 func validarVariante(codigo, nombre string, minorista, mayorista int64) error {

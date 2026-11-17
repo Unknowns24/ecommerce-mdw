@@ -1,3 +1,6 @@
+# En la VPS, Watchtower actualiza api y web cuando cambia su imagen :latest
+# en GHCR (ADR-005). En local, `docker compose up -d --build` las construye
+# desde el código y les pone ese mismo nombre.
 services:
   migrate:
     build: ./backend
@@ -9,6 +12,7 @@ services:
     restart: "no"
 
   api:
+    image: ghcr.io/unknowns24/ecommerce-mdw/backend:latest
     build: ./backend
     env_file: ./backend/.env
     ports:
@@ -18,6 +22,20 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Frontend en Next.js (ADR-007). Llama a la API por la red interna de
+  # compose, sin salir a internet. Publica solo en 127.0.0.1: desde afuera se
+  # entra por Nginx (deploy/nginx/).
+  web:
+    image: ghcr.io/unknowns24/ecommerce-mdw/frontend:latest
+    build: ./frontend
+    environment:
+      API_BASE_URL: http://api:8080
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
     restart: unless-stopped
 
   db:

@@ -6,14 +6,45 @@
 # POST /api/pedidos/{id}/pago
 ###############################################
 
-### iniciar pago de un pedido pendiente → 201 con initPoint
+# Paga su comprador: la sesión del dueño del pedido, o el invitado con el token
+# de su enlace privado en el header X-Token-Acceso. Cualquier otro → 404.
+# Antes de abrir la preferencia se le pregunta a Mercado Pago si ya hay un pago
+# en curso para el pedido; si hay, o si Mercado Pago no responde → 409.
+
+### invitado: iniciar pago con su token → 201 con initPoint (cobra productos + envío)
 POST {{base}}/api/pedidos/{{pedidoId}}/pago
+X-Token-Acceso: {{tokenAcceso}}
+
+### cliente registrado: iniciar pago de su pedido → 201 con initPoint
+POST {{base}}/api/pedidos/{{pedidoDelClienteId}}/pago
+Authorization: Bearer {{tokenCliente}}
+
+### sin sesión ni token → 404 (no 401: el pedido no existe para quien llama)
+POST {{base}}/api/pedidos/{{pedidoId}}/pago
+
+### token equivocado → 404
+POST {{base}}/api/pedidos/{{pedidoId}}/pago
+X-Token-Acceso: un-token-que-no-es
+
+### la sesión de otra persona → 404
+POST {{base}}/api/pedidos/{{pedidoId}}/pago
+Authorization: Bearer {{tokenCliente}}
 
 ### pedido que no existe → 404
 POST {{base}}/api/pedidos/99999999-9999-9999-9999-999999999999/pago
+X-Token-Acceso: {{tokenAcceso}}
 
-### pedido que ya no está pendiente de pago → 409
+### pedido que ya no está pendiente de pago (confirmado, cancelado o vencido) → 409
 POST {{base}}/api/pedidos/{{pedidoYaConfirmadoId}}/pago
+X-Token-Acceso: {{tokenAcceso}}
+
+### reserva de 15 minutos agotada → 409 "La reserva de este pedido venció"
+POST {{base}}/api/pedidos/{{pedidoVencidoId}}/pago
+X-Token-Acceso: {{tokenAcceso}}
+
+### ya hay un pago en curso en Mercado Pago (pending / in_process) → 409
+POST {{base}}/api/pedidos/{{pedidoConPagoEnCursoId}}/pago
+X-Token-Acceso: {{tokenAcceso}}
 
 ###############################################
 # POST /api/pagos/webhook — público a propósito
@@ -40,6 +71,13 @@ x-request-id: {{requestId}}
   "type": "payment",
   "data": { "id": "{{pagoId}}" }
 }
+
+# Un pago aprobado solo confirma el pedido si este todavía está PENDIENTE_DE_PAGO
+# y si lo acreditado es exactamente su total (productos + envío). Si no, se
+# registra el pago, el pedido no cambia y queda una línea "INCIDENCIA" en el log.
+# Los pedidos de Mercado Pago sin pago a los 15 minutos los cancela solo el
+# servidor (cada minuto), liberando su stock, salvo que Mercado Pago tenga un
+# pago en curso para ellos o no responda.
 
 ### la misma notificación otra vez → 200, el sistema queda igual (idempotente)
 POST {{base}}/api/pagos/webhook?data.id={{pagoId}}&type=payment

@@ -109,13 +109,30 @@ func (s *ServicioClasificacion) DesactivarCategoria(ctx context.Context, id uuid
 }
 
 func (s *ServicioClasificacion) validarPadre(ctx context.Context, id uuid.UUID, padreID *uuid.UUID) error {
+	return validarPadreCategoria(id, padreID,
+		func(padre uuid.UUID) (domain.Categoria, error) { return s.repo.Categoria(ctx, padre) },
+		func(categoria, posiblePadre uuid.UUID) (bool, error) {
+			return s.repo.EsDescendiente(ctx, categoria, posiblePadre)
+		})
+}
+
+// validarPadreCategoria aplica la regla de la spec (sección 3): cada categoría
+// tiene como máximo un padre y no admite ciclos. id es uuid.Nil al crear.
+// leerCategoria y esDescendiente son los accesos a la base; se reciben como
+// funciones para poder probar la regla sin base.
+func validarPadreCategoria(
+	id uuid.UUID,
+	padreID *uuid.UUID,
+	leerCategoria func(uuid.UUID) (domain.Categoria, error),
+	esDescendiente func(categoria, posiblePadre uuid.UUID) (bool, error),
+) error {
 	if padreID == nil {
 		return nil
 	}
 	if *padreID == uuid.Nil || *padreID == id {
 		return apierr.ErrValidacion{Campos: map[string]string{"padreId": "padre inválido"}}
 	}
-	padre, err := s.repo.Categoria(ctx, *padreID)
+	padre, err := leerCategoria(*padreID)
 	if errors.Is(err, apierr.ErrNoEncontrado) {
 		return apierr.ErrValidacion{Campos: map[string]string{"padreId": "categoría inexistente"}}
 	}
@@ -126,7 +143,7 @@ func (s *ServicioClasificacion) validarPadre(ctx context.Context, id uuid.UUID, 
 		return apierr.ErrValidacion{Campos: map[string]string{"padreId": "categoría inactiva"}}
 	}
 	if id != uuid.Nil {
-		cycle, err := s.repo.EsDescendiente(ctx, id, *padreID)
+		cycle, err := esDescendiente(id, *padreID)
 		if err != nil {
 			return err
 		}

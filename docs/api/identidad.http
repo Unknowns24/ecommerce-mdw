@@ -58,7 +58,9 @@ Content-Type: application/json
 
 {"correo":"nadie@example.com","contraseña":"clave-segura-123"}
 
-### cuenta propia → 200
+### cuenta propia → 200 con los datos, más "roles" y "permisos" de la sesión
+# Son los del token, no los de la base: un cambio de roles aplica al volver a ingresar (ADR-006).
+# Un cliente recibe "roles": ["cliente"], "permisos": []. Nunca trae credencial_hash.
 GET {{base}}/api/cuenta
 Authorization: Bearer {{tokenCliente}}
 

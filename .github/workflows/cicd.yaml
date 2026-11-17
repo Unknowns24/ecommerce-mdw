@@ -1,4 +1,4 @@
-name: CI/CD backend y frontend
+name: CI/CD
 
 on:
   push:
@@ -42,13 +42,19 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Instalar dependencias
-        run: npm ci --no-audit --no-fund
-      - name: Lint
+      - name: npm ci
+        run: npm ci
+      - name: lint
         run: npm run lint
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Build
+      # Next 16 genera los tipos globales de las rutas (LayoutProps,
+      # PageProps) en .next/types: sin este paso, tsc falla en un checkout
+      # limpio. Cuando la base agregue el script typecheck, estos dos pasos
+      # pasan a ser `npm run typecheck`.
+      - name: tipos de las rutas
+        run: npx next typegen
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: build
         run: npm run build
 
   publicar-imagen:
@@ -149,8 +155,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker exige nombres de repositorio en minúsculas. GITHUB_REPOSITORY
-      # conserva las mayúsculas del owner, por eso se normaliza acá.
+      # Mismo esquema que la imagen del backend: frontend-staging desde
+      # develop, frontend desde main y desde los tags v*.
       - name: Resolver nombres de las imágenes
         id: images
         shell: bash

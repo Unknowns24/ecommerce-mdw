@@ -34,12 +34,26 @@ func (l *Lector) VariantePorID(ctx context.Context, id uuid.UUID) (VarianteVendi
 		PrecioMinoristaCentavos int64
 		Estado                  string
 	}
-	err := l.db.WithContext(ctx).Table("variante").Select("id, producto_id, codigo, nombre, precio_minorista_centavos, estado").Where("id = ? AND estado = ?", id, "ACTIVA").Take(&row).Error
+	err := l.db.WithContext(ctx).Table("variante").Select("id, producto_id, codigo, nombre, precio_minorista_centavos, estado").Where("id = ?", id).Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return VarianteVendible{}, apierr.ErrNoEncontrado
 	}
 	if err != nil {
 		return VarianteVendible{}, err
 	}
+	if !esVendible(row.Estado) {
+		return VarianteVendible{}, apierr.ErrNoEncontrado
+	}
 	return VarianteVendible{ID: row.ID, ProductoID: row.ProductoID, Codigo: row.Codigo, Nombre: row.Nombre, PrecioMinoristaCentavos: row.PrecioMinoristaCentavos, Activa: true}, nil
 }
+
+const (
+	estadoVarianteActiva   = "ACTIVA"
+	estadoVarianteInactiva = "INACTIVA"
+)
+
+// esVendible aplica la regla de la spec (sección 6): una variante inactiva no
+// se ofrece aunque conserve existencias. Decide sólo por el estado: el stock
+// lo resuelve inventario, y una variante activa sin stock sigue siendo del
+// catálogo (se muestra «SIN STOCK»). Desactivar no equivale a agotar.
+func esVendible(estado string) bool { return estado == estadoVarianteActiva }

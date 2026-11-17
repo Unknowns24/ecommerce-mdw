@@ -22,3 +22,19 @@ El pipeline de CI/CD (`.github/workflows/cicd.yaml`) tiene dos jobs: `verificar`
 **Resignamos:** no hay *preview deployment* automático por Pull Request — el nivel "destacado" del criterio de Producción de la rúbrica, que en Vercel sale gratis, en una VPS requiere armar un entorno efímero por rama (reservado para una iteración futura, ver `docs/plan-de-trabajo.md`). La URL pública es una sola y no cambia en todo el cuatrimestre: se documenta en `readme.md`, sección Producción.
 
 La elección del motor de base de datos (PostgreSQL) y su driver se completa en [ADR-002](ADR-002-persistencia-y-migraciones.md#actualización--2026-10-04).
+
+## Actualización — 2026-11-05
+
+El job `desplegar` por SSH descripto en la Decisión no existe. El pipeline real (`.github/workflows/cicd.yaml`) es:
+
+- `verificar` (*Verificar backend*): corre en cada push y cada PR — `go build`, `go vet`, `go test`, `gofmt -l`.
+- `publicar-imagen`: corre sólo en push, después de `verificar`, y publica la imagen del backend en GHCR:
+  - desde `develop`: `ghcr.io/unknowns24/ecommerce-mdw/backend-staging`, con los tags `v0.0.0-rc.<run>`, `<sha>` y `latest`;
+  - desde `main`: `ghcr.io/unknowns24/ecommerce-mdw/backend`, con los tags `<sha>` y `latest`;
+  - desde un tag `v*`: la misma imagen `backend`, con los tags `<versión>`, `<sha>` y `latest`.
+
+El pipeline no entra a la VPS. Producción corre `backend:latest`, y Watchtower, en la VPS, detecta la imagen nueva en GHCR y reinicia el contenedor `api`. Las migraciones se corren a mano en la VPS con `docker compose run --rm api migrate`.
+
+**Consecuencia:** como Watchtower reinicia `api` en cuanto aparece la imagen nueva, una versión que trae migraciones puede quedar corriendo antes de que alguien las aplique. Eso se aparta de lo que pide ADR-002 (migrar antes de levantar el servidor nuevo). Hasta que se decida otra cosa, quien mergea a `main` un cambio con migraciones las corre en la VPS apenas se publica la imagen.
+
+El `ENTRYPOINT` de la imagen ya es `/api`: el argumento de `docker compose run` es solo el subcomando (`migrate`). Con `run --rm api /api migrate`, el primer argumento es `/api` y lo que se levanta es el servidor, no las migraciones.

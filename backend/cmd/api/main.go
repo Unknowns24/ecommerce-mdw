@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -68,6 +69,10 @@ func main() {
 	inventario.Montar(r, db, cfg, mw)
 	pagos.Montar(r, db, cfg, mw)
 	pedidos.Montar(r, db, cfg, mw)
+
+	// Cancela los pedidos de Mercado Pago con la reserva agotada y libera su
+	// stock (H14). Arranca acá y no antes: el subcomando migrate no lo corre.
+	pagos.IniciarVencimiento(context.Background(), db, cfg)
 
 	log.Printf("escuchando en :%s (version=%s)", cfg.AppPort, version)
 	if err := http.ListenAndServe(":"+cfg.AppPort, r); err != nil {
