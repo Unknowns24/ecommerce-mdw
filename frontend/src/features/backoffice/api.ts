@@ -2,7 +2,7 @@ import "server-only";
 
 import { api } from "@/lib/api";
 
-import type { PaginaPedidos, PedidoAdmin } from "./tipos";
+import type { IncidenciaPago, PaginaPedidos, PedidoAdmin } from "./tipos";
 
 export const TAMANO_PAGINA = 20;
 
@@ -18,4 +18,14 @@ export function listarPedidos(f: FiltrosPedidos) {
 
 export function obtenerPedido(id: string) {
   return api<PedidoAdmin>(`/api/admin/pedidos/${encodeURIComponent(id)}`);
+}
+
+export function listarIncidencias(id: string) {
+  return api<IncidenciaPago[]>(`/api/admin/pedidos/${encodeURIComponent(id)}/incidencias`);
+}
+
+export function resolverIncidencia(pedidoId: string, incidenciaId: string, nota: string) {
+  return api(`/api/admin/pedidos/${encodeURIComponent(pedidoId)}/incidencias/${encodeURIComponent(incidenciaId)}/resolucion`, {
+    metodo: "POST", cuerpo: { nota },
+  });
 }

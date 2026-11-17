@@ -1,4 +1,26 @@
 @base = http://localhost:8080
+# En producción son obligatorios MERCADOPAGO_ACCESS_TOKEN y MERCADOPAGO_WEBHOOK_SECRET.
+# Una clave vacía nunca permite verificar un webhook.
+
+### listar incidencias del pedido (pendientes primero, hasta 100); inexistente → 404
+GET {{base}}/api/admin/pedidos/{{pedidoId}}/incidencias
+Authorization: Bearer {{tokenDueno}}
+
+### cerrar manualmente → 200 {"estado":"RESUELTA"}; repetir conserva el primer cierre
+# Sin sesión → 401; sin pedidos.gestionar → 403; incidencia de otro pedido → 404.
+# Nota ausente, vacía o de más de 1000 caracteres → 400 detalles.campos.nota.
+# No modifica pago, pedido ni stock; no llama a MP para reintegrar.
+POST {{base}}/api/admin/pedidos/{{pedidoId}}/incidencias/{{incidenciaId}}/resolucion
+Authorization: Bearer {{tokenDueno}}
+Content-Type: application/json
+
+{"nota":"Se verificó el cobro y se realizó el reintegro manual en Mercado Pago."}
+
+# El listado GET /api/admin/pedidos agrega incidenciasPendientes en cada fila.
+# Cada incidencia expone id, referenciaExterna, motivo (MONTO_DISTINTO o
+# PEDIDO_NO_PENDIENTE), montoCentavos, totalPedidoCentavos, creadoEn y,
+# después del cierre, resueltoPor, resueltoPorNombre, resueltoEn, notaResolucion.
+# Webhook: responde 200 después de persistir; fallas de proveedor/base → 500 para reintentar.
 # Producción: descomentar después del merge y correr el archivo entero.
 # @base = https://api.tu-dominio.com
 

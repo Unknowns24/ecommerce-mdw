@@ -168,7 +168,8 @@ func (r *RepositorioPedidos) ListarAdmin(ctx context.Context, f FiltrosAdmin, li
 		return nil, 0, err
 	}
 	var pedidos []domain.Pedido
-	err := base.Order("creado_en DESC, numero DESC").Limit(limit).Offset(offset).Find(&pedidos).Error
+	err := base.Select("pedido.id, numero, modo_entrega, medio_pago, estado_pedido, estado_pago, total_centavos, creado_en, comprador_nombre, comprador_apellido, (SELECT COUNT(*) FROM incidencia_pago i WHERE i.pedido_id = pedido.id AND i.resuelto_en IS NULL) AS incidencias_pendientes").
+		Order("creado_en DESC, numero DESC").Limit(limit).Offset(offset).Find(&pedidos).Error
 	return pedidos, total, err
 }
 

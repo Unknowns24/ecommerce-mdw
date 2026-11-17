@@ -99,9 +99,10 @@ type Pedido struct {
 	CanceladoEn       *time.Time
 	MotivoCancelacion *string
 
-	Detalles      []DetallePedido `gorm:"foreignKey:PedidoID"`
-	CreadoEn      time.Time       `gorm:"autoCreateTime;index"`
-	ActualizadoEn time.Time       `gorm:"autoUpdateTime"`
+	Detalles              []DetallePedido `gorm:"foreignKey:PedidoID"`
+	CreadoEn              time.Time       `gorm:"autoCreateTime;index"`
+	ActualizadoEn         time.Time       `gorm:"autoUpdateTime"`
+	IncidenciasPendientes int             `gorm:"->;-:migration"`
 }
 
 func (Pedido) TableName() string { return "pedido" }

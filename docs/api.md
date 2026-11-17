@@ -54,6 +54,7 @@ Reglas que también se prueban, aunque no son de permisos: el bootstrap con un d
 | GET, PATCH, DELETE  | `/api/admin/productos/{id}`                   | `catalogo.escribir` | 401        | 403         | —     | H08      |
 | GET, POST           | `/api/admin/variantes`                        | `catalogo.escribir` | 401        | 403         | —     | H08      |
 | GET, PATCH, DELETE  | `/api/admin/variantes/{id}`                   | `catalogo.escribir` | 401        | 403         | —     | H08      |
+| GET                 | `/api/admin/variantes/{id}/imagenes`          | `catalogo.escribir` | 401        | 403         | —     | H08      |
 | POST                | `/api/admin/variantes/{id}/imagenes`          | `catalogo.escribir` | 401        | 403         | —     | H08      |
 | PUT                 | `/api/admin/variantes/{id}/imagen-principal`  | `catalogo.escribir` | 401        | 403         | —     | H08      |
 | DELETE              | `/api/admin/imagenes/{id}`                    | `catalogo.escribir` | 401        | 403         | —     | H08      |
@@ -92,6 +93,8 @@ Una variante inactiva no aparece en `/api/catalogo/variantes` y `/api/catalogo/v
 | POST          | `/api/admin/pedidos/{id}/entrega`             | `pedidos.gestionar`            | 401        | 403         | —     | H17      |
 | POST          | `/api/admin/pedidos/{id}/cobro-efectivo`      | `pedidos.gestionar`            | 401        | 403         | —     | H15, H17 |
 | POST          | `/api/admin/pedidos/{id}/cancelacion`         | `pedidos.gestionar`            | 401        | 403         | —     | H18      |
+| GET           | `/api/admin/pedidos/{id}/incidencias`         | `pedidos.gestionar`            | 401        | 403         | —     | H14      |
+| POST          | `/api/admin/pedidos/{id}/incidencias/{incidenciaID}/resolucion` | `pedidos.gestionar` | 401 | 403 | — | H14 |
 
 `GET /api/tienda/configuracion` es público (no pide sesión) y devuelve `efectivoHabilitado`, `distanciaMaximaMetros` y las tarifas `{desdeMetros, hastaMetros, costoCentavos}`, para que el checkout ofrezca efectivo solo si está habilitado y anticipe el costo de envío (H13). El costo que vale es el que calcula `POST /api/pedidos`. Si la tienda todavía no cargó ninguna configuración responde 404, y el checkout lo lee como «el envío no está disponible».
 

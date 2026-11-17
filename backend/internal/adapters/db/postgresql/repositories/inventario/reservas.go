@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/Unknowns24/ecommerce-mdw/internal/core/domain"
 )
@@ -17,6 +18,25 @@ func NuevoRepositorioReservas(db *gorm.DB) *RepositorioReservas {
 
 func (r *RepositorioReservas) Crear(ctx context.Context, reserva *domain.ReservaStock) error {
 	return r.db.WithContext(ctx).Create(reserva).Error
+}
+
+// Cada lote se procesa por tandas: no se trunca una restitución con muchas reservas.
+func (r *RepositorioReservas) PorPedidoBloqueando(ctx context.Context, pedidoID uuid.UUID, estados ...domain.EstadoReserva) ([]domain.ReservaStock, error) {
+	var reservas []domain.ReservaStock
+	err := r.db.WithContext(ctx).Select("id, pedido_id, lote_id, unidades, estado, vence_en, creado_en").
+		Where("pedido_id = ? AND estado IN ?", pedidoID, estados).
+		Order("lote_id, id").Limit(1000).Clauses(clause.Locking{Strength: "UPDATE"}).Find(&reservas).Error
+	return reservas, err
+}
+
+func (r *RepositorioReservas) Cancelacion(ctx context.Context, pedidoID uuid.UUID) (bool, *uuid.UUID, error) {
+	var p struct {
+		EstadoPedido string
+		CanceladoPor *uuid.UUID
+	}
+	err := r.db.WithContext(ctx).Table("pedido").Select("estado_pedido, cancelado_por").
+		Where("id = ?", pedidoID).Clauses(clause.Locking{Strength: "UPDATE"}).Take(&p).Error
+	return p.EstadoPedido == "CANCELADO", p.CanceladoPor, err
 }
 
 func (r *RepositorioReservas) ActivasPorPedido(ctx context.Context, pedidoID uuid.UUID) ([]domain.ReservaStock, error) {

@@ -11,6 +11,19 @@ import (
 )
 
 func montarImagenes(r chi.Router, s *usecase.ServicioImagenes) {
+	r.Get("/variantes/{id}/imagenes", func(w http.ResponseWriter, req *http.Request) {
+		id, err := idDeRuta(req)
+		if err != nil {
+			apierr.Responder(w, "listar imágenes", err)
+			return
+		}
+		items, err := s.Listar(req.Context(), id)
+		if err != nil {
+			apierr.Responder(w, "listar imágenes", err)
+			return
+		}
+		apierr.JSON(w, http.StatusOK, items)
+	})
 	r.Post("/variantes/{id}/imagenes", func(w http.ResponseWriter, req *http.Request) {
 		id, err := idDeRuta(req)
 		if err != nil {

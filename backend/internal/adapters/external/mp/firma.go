@@ -14,6 +14,9 @@ import (
 // request-id>;ts:<ts>;" con el secreto del webhook. Sin firma válida, la
 // notificación no se procesa.
 func VerificarFirma(secreto, xSignature, xRequestID, dataID string) bool {
+	if strings.TrimSpace(secreto) == "" {
+		return false
+	}
 	ts, v1 := partesDeFirma(xSignature)
 	if ts == "" || v1 == "" {
 		return false

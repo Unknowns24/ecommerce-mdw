@@ -17,11 +17,12 @@ export type PedidoResumen = {
   creadoEn: string;
   compradorNombre: string;
   compradorApellido: string;
+  incidenciasPendientes: number;
 };
 
 export type PaginaPedidos = { items: PedidoResumen[]; total: number; pagina: number; tamano: number };
 
-export type PedidoAdmin = Omit<PedidoResumen, "compradorNombre" | "compradorApellido"> & {
+export type PedidoAdmin = Omit<PedidoResumen, "compradorNombre" | "compradorApellido" | "incidenciasPendientes"> & {
   domicilio?: string;
   distanciaMetros?: number;
   envioCentavos: number;
@@ -32,6 +33,18 @@ export type PedidoAdmin = Omit<PedidoResumen, "compradorNombre" | "compradorApel
   usuarioId?: string;
   canceladoEn?: string;
   motivoCancelacion?: string;
+};
+
+export type IncidenciaPago = {
+  id: string;
+  referenciaExterna: string;
+  motivo: "MONTO_DISTINTO" | "PEDIDO_NO_PENDIENTE";
+  montoCentavos: number;
+  totalPedidoCentavos: number;
+  creadoEn: string;
+  resueltoEn?: string;
+  resueltoPorNombre?: string;
+  notaResolucion?: string;
 };
 
 export const ESTADOS_PEDIDO: Record<EstadoPedido, string> = {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -51,6 +52,9 @@ func conectarParaTest(t *testing.T) *gorm.DB {
 		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS token_acceso varchar(64) NOT NULL DEFAULT ''`,
 		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS vence_en timestamptz`,
 		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS cancelado_en timestamptz`,
+		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS cancelado_por uuid`,
+		`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS nombre text NOT NULL DEFAULT 'Prueba'`,
+		`ALTER TABLE usuario ADD COLUMN IF NOT EXISTS apellido text NOT NULL DEFAULT 'Local'`,
 		`ALTER TABLE pedido ADD COLUMN IF NOT EXISTS motivo_cancelacion varchar(500)`,
 		`CREATE TABLE IF NOT EXISTS detalle_pedido (
 			id uuid PRIMARY KEY,
@@ -68,7 +72,7 @@ func conectarParaTest(t *testing.T) *gorm.DB {
 		}
 	}
 
-	migrador := database.NewMigrator(db, schema.MigracionesInventario())
+	migrador := database.NewMigrator(db, append(schema.MigracionesInventario(), schema.MigracionesIncidenciasPagos()...))
 	if err := migrador.Migrate(); err != nil {
 		t.Fatalf("migrar inventario+pagos: %v", err)
 	}
@@ -174,6 +178,7 @@ func TestProcesarNotificacionNoConfirmaLoQueNoCorresponde(t *testing.T) {
 		t.Run(c.nombre, func(t *testing.T) {
 			pedidoID := crearPedidoEnEstado(t, db, c.estadoPedido)
 			t.Cleanup(func() {
+				db.Exec("DELETE FROM incidencia_pago WHERE pedido_id = ?", pedidoID)
 				db.Exec("DELETE FROM intento_pago WHERE pedido_id = ?", pedidoID)
 				db.Exec("DELETE FROM pedido WHERE id = ?", pedidoID)
 			})
@@ -192,5 +197,30 @@ func TestProcesarNotificacionNoConfirmaLoQueNoCorresponde(t *testing.T) {
 				t.Fatalf("pedido = (%s, %s), esperado (%s, PENDIENTE)", estadoPedido, estadoPago, c.estadoFinal)
 			}
 		})
+	}
+}
+
+func TestCancelarRestituyeStockConsumidoUnaSolaVez(t *testing.T) {
+	db := conectarParaTest(t)
+	pedido := pedidoConReserva(t, db, time.Now().Add(time.Minute))
+	stock := usecases.NuevoServicioStock(db)
+	ctx := context.Background()
+	if err := db.Transaction(func(tx *gorm.DB) error { return stock.Confirmar(ctx, tx, pedido) }); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("UPDATE pedido SET estado_pedido = 'CANCELADO' WHERE id = ?", pedido).Error; err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := db.Transaction(func(tx *gorm.DB) error { return stock.Liberar(ctx, tx, pedido) }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var neto int
+	if err := db.Raw("SELECT COALESCE(SUM(CASE WHEN tipo='SALIDA' THEN -unidades ELSE unidades END),0) FROM movimiento_stock WHERE pedido_id=?", pedido).Scan(&neto).Error; err != nil {
+		t.Fatal(err)
+	}
+	if neto != 0 {
+		t.Fatalf("la cancelación debe compensar exactamente la salida: movimiento neto %d", neto)
 	}
 }

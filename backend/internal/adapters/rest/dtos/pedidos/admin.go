@@ -55,8 +55,9 @@ func APedidoAdmin(p domain.Pedido) PedidoAdminResponse {
 // PedidoAdminResumenResponse es una fila del listado administrativo.
 type PedidoAdminResumenResponse struct {
 	PedidoResumenResponse
-	CompradorNombre   string `json:"compradorNombre"`
-	CompradorApellido string `json:"compradorApellido"`
+	CompradorNombre       string `json:"compradorNombre"`
+	CompradorApellido     string `json:"compradorApellido"`
+	IncidenciasPendientes int    `json:"incidenciasPendientes"`
 }
 
 type PaginaAdminResponse struct {
@@ -76,6 +77,7 @@ func APaginaAdmin(p uc.PaginaPedidos) PaginaAdminResponse {
 				TotalCentavos: x.TotalCentavos, CreadoEn: x.CreadoEn,
 			},
 			CompradorNombre: x.CompradorNombre, CompradorApellido: x.CompradorApellido,
+			IncidenciasPendientes: x.IncidenciasPendientes,
 		}
 	}
 	return PaginaAdminResponse{Items: items, Total: p.Total, Pagina: p.Pagina, Tamano: p.Tamano}

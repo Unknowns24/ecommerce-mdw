@@ -58,6 +58,7 @@ func pedidoConReserva(t *testing.T, db *gorm.DB, venceEn time.Time) uuid.UUID {
 		}
 	}
 	t.Cleanup(func() {
+		db.Exec("DELETE FROM incidencia_pago WHERE pedido_id = ?", pedido)
 		db.Exec("DELETE FROM intento_pago WHERE pedido_id = ?", pedido)
 		db.Exec("DELETE FROM movimiento_stock WHERE pedido_id = ?", pedido)
 		db.Exec("DELETE FROM reserva_stock WHERE pedido_id = ?", pedido)

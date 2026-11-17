@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -28,9 +29,8 @@ type cuerpoWebhook struct {
 }
 
 // webhook recibe las notificaciones de Mercado Pago. Público a propósito:
-// sin firma válida responde 401 y no procesa nada; con firma válida siempre
-// responde 200, incluso si algo interno falla, para que Mercado Pago no
-// reintente en loop una notificación que ya recibimos.
+// sin firma válida responde 401. Solo reconoce la recepción después de guardar
+// el pago y su resultado; un fallo transitorio devuelve 500 para permitir reintentos.
 func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 	var cuerpo cuerpoWebhook
 	_ = json.NewDecoder(r.Body).Decode(&cuerpo) // el cuerpo nunca decide el resultado, sólo puede aportar el id
@@ -57,10 +57,7 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Nunca se confía en el cuerpo de la notificación para saber si está
 		// pagado: si no se puede consultar al proveedor, no se confirma nada.
-		// Se responde 200 igual para no provocar un reintento en loop por una
-		// falla que un reintento inmediato no va a resolver.
-		log.Printf("%s: no se pudo consultar el pago %s: %v", endpointWebhook, dataID, err)
-		apierr.JSON(w, http.StatusOK, nil)
+		apierr.Responder(w, endpointWebhook, fmt.Errorf("consultar pago %s: %s", dataID, err))
 		return
 	}
 
@@ -72,7 +69,8 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := procesarNotificacion(ctx, h.db, h.stock, h.intentos, pedidoID, pago); err != nil {
-		log.Printf("%s: no se pudo procesar el pago %s: %v", endpointWebhook, dataID, err)
+		apierr.Responder(w, endpointWebhook, fmt.Errorf("procesar pago %s: %s", dataID, err))
+		return
 	}
 
 	apierr.JSON(w, http.StatusOK, nil)
@@ -85,21 +83,13 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 //     nada; si no, registra el intento y, solo si el pedido todavía espera el
 //     pago y lo acreditado es exactamente su total, descuenta stock
 //     (ServicioStock.Confirmar ya es idempotente por su cuenta) y confirma el
-//     pedido. Si no, deja la incidencia en el log para la administración.
+//     pedido. Si no, persiste la incidencia para la administración.
 //   - cualquier otro estado: sólo deja registrado el intento con su estado.
 //
 // El pedido se lee con FOR UPDATE dentro de la transacción: el vencimiento
 // automático no puede cancelarlo mientras se decide su confirmación.
 func procesarNotificacion(ctx context.Context, db *gorm.DB, stock *usecases.ServicioStock, intentos *repo.RepositorioIntentos, pedidoID uuid.UUID, pago mp.Pago) error {
 	estado := estadoIntentoDesdeMercadoPago(pago.Estado)
-
-	existente, encontrado, err := intentos.PorReferenciaExterna(ctx, domain.ProveedorMercadoPago, pago.ID)
-	if err != nil {
-		return err
-	}
-	if encontrado && existente.Estado == domain.IntentoAprobado {
-		return nil // ya procesado: la misma notificación dos veces deja el sistema igual
-	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		pedido, existe, err := pedidoPorID(ctx, tx, pedidoID, true)
@@ -111,6 +101,26 @@ func procesarNotificacion(ctx context.Context, db *gorm.DB, stock *usecases.Serv
 		}
 
 		intentosTx := repo.NuevoRepositorioIntentos(tx)
+		existente, encontrado, err := intentosTx.PorReferenciaExterna(ctx, domain.ProveedorMercadoPago, pago.ID)
+		if err != nil {
+			return err
+		}
+		registrarIncidencia := func(motivo string) error {
+			return repo.NuevoRepositorioIncidencias(tx).Registrar(ctx, &domain.IncidenciaPago{
+				ID: uuid.New(), PedidoID: pedidoID, ReferenciaExterna: pago.ID, Motivo: motivo,
+				MontoCentavos: pago.MontoCentavos, TotalPedidoCentavos: pedido.TotalCentavos, CreadoEn: time.Now(),
+			})
+		}
+		if encontrado && existente.Estado == domain.IntentoAprobado {
+			// Recupera anomalías registradas antes de incorporar las incidencias.
+			// Una repetición del cobro que ya confirmó el pedido sigue siendo inocua.
+			if pedido.EstadoPago != domain.PagoAprobado {
+				if motivo := reglas.MotivoIncidencia(reglas.DecidirConfirmacion(pedido, existente.MontoCentavos)); motivo != "" {
+					return registrarIncidencia(motivo)
+				}
+			}
+			return nil
+		}
 
 		if encontrado {
 			if err := intentosTx.CambiarEstado(ctx, existente.ID, estado); err != nil {
@@ -134,15 +144,8 @@ func procesarNotificacion(ctx context.Context, db *gorm.DB, stock *usecases.Serv
 			return nil
 		}
 
-		switch reglas.DecidirConfirmacion(pedido, pago.MontoCentavos) {
-		case reglas.NoConfirmarPedidoNoPendiente:
-			log.Printf("%s: INCIDENCIA pago %s aprobado para el pedido %s en estado %s: no se confirma, revisar stock y reintegro",
-				endpointWebhook, pago.ID, pedidoID, pedido.EstadoPedido)
-			return nil
-		case reglas.NoConfirmarMontoDistinto:
-			log.Printf("%s: INCIDENCIA pago %s acreditó %d centavos y el pedido %s suma %d: no se confirma",
-				endpointWebhook, pago.ID, pago.MontoCentavos, pedidoID, pedido.TotalCentavos)
-			return nil
+		if motivo := reglas.MotivoIncidencia(reglas.DecidirConfirmacion(pedido, pago.MontoCentavos)); motivo != "" {
+			return registrarIncidencia(motivo)
 		}
 
 		if err := stock.Confirmar(ctx, tx, pedidoID); err != nil {

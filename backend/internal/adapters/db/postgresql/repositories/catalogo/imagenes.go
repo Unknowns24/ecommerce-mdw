@@ -16,6 +16,13 @@ type Imagenes struct{ db *gorm.DB }
 
 func NuevoImagenes(db *gorm.DB) *Imagenes { return &Imagenes{db: db} }
 
+func (r *Imagenes) PorVariante(ctx context.Context, id uuid.UUID) ([]domain.ImagenVariante, error) {
+	items := make([]domain.ImagenVariante, 0)
+	err := r.db.WithContext(ctx).Select("id, variante_id, referencia_imagen, es_principal, orden").
+		Where("variante_id = ?", id).Order("orden ASC, id ASC").Limit(100).Find(&items).Error
+	return items, err
+}
+
 func (r *Imagenes) Crear(ctx context.Context, imagen *domain.ImagenVariante) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := bloquearVariante(tx, imagen.VarianteID); err != nil {

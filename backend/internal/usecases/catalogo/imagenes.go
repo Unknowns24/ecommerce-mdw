@@ -22,6 +22,13 @@ func NuevoServicioImagenes(db *gorm.DB) *ServicioImagenes {
 	return &ServicioImagenes{imagenes: repo.NuevoImagenes(db), variantes: repo.NuevoVariantes(db)}
 }
 
+func (s *ServicioImagenes) Listar(ctx context.Context, varianteID uuid.UUID) ([]domain.ImagenVariante, error) {
+	if _, err := s.variantes.PorID(ctx, varianteID); err != nil {
+		return nil, err
+	}
+	return s.imagenes.PorVariante(ctx, varianteID)
+}
+
 func (s *ServicioImagenes) Crear(ctx context.Context, varianteID uuid.UUID, in dto.CrearImagen) (domain.ImagenVariante, error) {
 	if _, err := s.variantes.PorID(ctx, varianteID); err != nil {
 		return domain.ImagenVariante{}, err

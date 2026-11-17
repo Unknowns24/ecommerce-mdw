@@ -336,6 +336,10 @@ Content-Type: application/json
 
 {"productoId":"{{productoId}}","codigo":"VS-LOVE-236","nombre":"Duplicada","precioMinoristaCentavos":10000,"precioMayoristaCentavos":8000}
 
+### listar imágenes ordenadas (hasta 100); variante inexistente → 404
+GET {{base}}/api/admin/variantes/{{varianteId}}/imagenes
+Authorization: Bearer {{tokenDueno}}
+
 ### agregar imagen → 201
 # @name agregarImagen
 POST {{base}}/api/admin/variantes/{{varianteId}}/imagenes

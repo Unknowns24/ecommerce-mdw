@@ -113,45 +113,82 @@ func (s *ServicioStock) Reservar(ctx context.Context, tx *gorm.DB, pedidoID uuid
 // notificación repetida de Mercado Pago no puede descontar dos veces.
 func (s *ServicioStock) Confirmar(ctx context.Context, tx *gorm.DB, pedidoID uuid.UUID) error {
 	reservasRepo := repo.NuevoRepositorioReservas(tx)
-	activas, err := reservasRepo.ActivasPorPedido(ctx, pedidoID)
-	if err != nil {
-		return err
-	}
+	for {
+		activas, err := reservasRepo.PorPedidoBloqueando(ctx, pedidoID, domain.ReservaActiva)
+		if err != nil {
+			return err
+		}
+		if len(activas) == 0 {
+			return nil
+		}
 
-	movimientosRepo := repo.NuevoRepositorioMovimientos(tx)
-	for _, reserva := range activas {
-		if err := reservasRepo.CambiarEstado(ctx, reserva.ID, domain.ReservaConsumida); err != nil {
-			return err
-		}
-		movimiento := &domain.MovimientoStock{
-			ID:       uuid.New(),
-			LoteID:   reserva.LoteID,
-			Tipo:     domain.MovimientoSalida,
-			Unidades: reserva.Unidades,
-			Motivo:   "Venta confirmada",
-			PedidoID: &pedidoID,
-		}
-		if err := movimientosRepo.Crear(ctx, movimiento); err != nil {
-			return err
+		movimientosRepo := repo.NuevoRepositorioMovimientos(tx)
+		for _, reserva := range activas {
+			// El checkout y los ajustes bloquean estos mismos lotes antes de leer disponibilidad.
+			if _, err := repo.NuevoRepositorioLotes(tx).PorIDBloqueando(ctx, reserva.LoteID); err != nil {
+				return err
+			}
+			if err := reservasRepo.CambiarEstado(ctx, reserva.ID, domain.ReservaConsumida); err != nil {
+				return err
+			}
+			movimiento := &domain.MovimientoStock{
+				ID:       uuid.New(),
+				LoteID:   reserva.LoteID,
+				Tipo:     domain.MovimientoSalida,
+				Unidades: reserva.Unidades,
+				Motivo:   "Venta confirmada",
+				PedidoID: &pedidoID,
+			}
+			if err := movimientosRepo.Crear(ctx, movimiento); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
 }
 
-// Liberar pasa las reservas ACTIVA del pedido a LIBERADA. Es idempotente y
-// no genera movimiento: liberar una reserva no es una entrada física.
+// Liberar cancela las reservas del pedido: las activas no generan entrada;
+// las consumidas compensan la salida en su lote. Solo después de cancelar,
+// nunca al entregar. La fila bloqueada y el estado LIBERADA impiden repetirla.
 func (s *ServicioStock) Liberar(ctx context.Context, tx *gorm.DB, pedidoID uuid.UUID) error {
 	reservasRepo := repo.NuevoRepositorioReservas(tx)
-	activas, err := reservasRepo.ActivasPorPedido(ctx, pedidoID)
+	cancelado, responsable, err := reservasRepo.Cancelacion(ctx, pedidoID)
 	if err != nil {
 		return err
 	}
-	for _, reserva := range activas {
-		if err := reservasRepo.CambiarEstado(ctx, reserva.ID, domain.ReservaLiberada); err != nil {
+	if !cancelado {
+		return apierr.ErrRegla{Mensaje: "Solo se restituye stock de un pedido cancelado antes de entregar."}
+	}
+	for {
+		reservas, err := reservasRepo.PorPedidoBloqueando(ctx, pedidoID, domain.ReservaActiva, domain.ReservaConsumida)
+		if err != nil {
 			return err
 		}
+		if len(reservas) == 0 {
+			return nil
+		}
+		for _, reserva := range reservas {
+			if _, err := repo.NuevoRepositorioLotes(tx).PorIDBloqueando(ctx, reserva.LoteID); err != nil {
+				return err
+			}
+			if unidades := unidadesARestituir(reserva.Estado, reserva.Unidades); unidades > 0 {
+				movimiento := &domain.MovimientoStock{ID: uuid.New(), LoteID: reserva.LoteID, Tipo: domain.MovimientoAjuste,
+					Unidades: unidades, Motivo: "Restitución por cancelación de pedido pagado", PedidoID: &pedidoID, ResponsableID: responsable}
+				if err := repo.NuevoRepositorioMovimientos(tx).Crear(ctx, movimiento); err != nil {
+					return err
+				}
+			}
+			if err := reservasRepo.CambiarEstado(ctx, reserva.ID, domain.ReservaLiberada); err != nil {
+				return err
+			}
+		}
 	}
-	return nil
+}
+
+func unidadesARestituir(estado domain.EstadoReserva, unidades int) int {
+	if estado == domain.ReservaConsumida {
+		return unidades
+	}
+	return 0
 }
 
 // metodologiaDeVariante consulta la tabla de catálogo directamente (misma
