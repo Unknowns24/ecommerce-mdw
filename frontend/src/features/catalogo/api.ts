@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { api, ErrorApi } from "@/lib/api";
 
 import type { CategoriaPublica, DetalleVariante, FiltrosCatalogo, MarcaPublica, PaginaVariantes } from "./tipos";
@@ -37,11 +39,13 @@ export type CondicionesEntrega = {
   tarifas: { desdeMetros: number; hastaMetros: number; costoCentavos: number }[];
 };
 
-export async function obtenerCondicionesEntrega(): Promise<CondicionesEntrega | null> {
+// La piden la barra superior, la portada, la ficha y el pie en el mismo
+// render: cache() hace un solo pedido a la API por request.
+export const obtenerCondicionesEntrega = cache(async (): Promise<CondicionesEntrega | null> => {
   try {
     return await api<CondicionesEntrega>("/api/tienda/configuracion");
   } catch (e) {
     if (e instanceof ErrorApi && e.status === 404) return null;
     throw e;
   }
-}
+});

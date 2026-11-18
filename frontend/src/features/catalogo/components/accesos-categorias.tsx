@@ -8,6 +8,8 @@ import type { CategoriaPublica, FiltrosCatalogo } from "../tipos";
 // Las categorías como accesos rápidos sobre la grilla (las de la API, no
 // inventadas). Conservan búsqueda, marca y orden; vuelven a la página 1. La
 // activa se marca con aria-current y con texto subrayado, no solo con color.
+// Centradas; si no entran (teléfono), se desplazan de costado. En escritorio
+// no se muestran: las categorías ya están en la fila del encabezado.
 export function AccesosCategorias({ filtros, categorias }: { filtros: FiltrosCatalogo; categorias: CategoriaPublica[] }) {
   const todas = categorias.flatMap((c) => [c, ...(c.hijas ?? [])]);
   if (todas.length === 0) return null;
@@ -19,8 +21,8 @@ export function AccesosCategorias({ filtros, categorias }: { filtros: FiltrosCat
           href={hrefCatalogo(filtros, { categoria: id, pagina: 1 })}
           aria-current={activo ? "page" : undefined}
           className={cn(
-            "inline-flex h-11 items-center whitespace-nowrap border-b-2 px-1 text-sm sm:h-10",
-            activo ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground hover:text-foreground",
+            "inline-flex h-11 items-center border-b whitespace-nowrap text-xs tracking-[0.16em] uppercase",
+            activo ? "border-foreground font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
           {texto}
@@ -29,8 +31,8 @@ export function AccesosCategorias({ filtros, categorias }: { filtros: FiltrosCat
     );
   };
   return (
-    <nav aria-label="Categorías" className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-      <ul className="flex gap-5 border-b">
+    <nav aria-label="Categorías" className="-mx-4 overflow-x-auto px-4 lg:hidden">
+      <ul className="mx-auto flex w-max gap-7">
         {enlace("", "Todo")}
         {todas.map((c) => enlace(c.id, c.nombre))}
       </ul>
