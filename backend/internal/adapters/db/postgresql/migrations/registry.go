@@ -16,5 +16,6 @@ func Todas() []*gormigrate.Migration {
 	todas = append(todas, schema.MigracionesCatalogo()...)   // Genaro  20261004_02_*
 	todas = append(todas, schema.MigracionesInventario()...) // vos     20261004_03_*
 	todas = append(todas, schema.MigracionesPedidos()...)    // Nicolás 20261004_04_*
+	todas = append(todas, schema.MigracionesIncidenciasPagos()...)
 	return todas
 }

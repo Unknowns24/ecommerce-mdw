@@ -5,7 +5,8 @@ import { notFound } from "next/navigation";
 import { BotonAccion } from "@/components/formulario";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { obtenerPedido } from "@/features/backoffice/api";
+import { listarIncidencias, obtenerPedido } from "@/features/backoffice/api";
+import { IncidenciasPago } from "@/features/backoffice/components/incidencias-pago";
 import { EstadoDelPago, EstadoDelPedido } from "@/features/backoffice/components/estados";
 import { FormularioCancelar } from "@/features/backoffice/components/formulario-cancelar";
 import { TEXTO_ENTREGA, type PedidoAdmin } from "@/features/backoffice/tipos";
@@ -13,7 +14,7 @@ import { requerirPermiso } from "@/features/identidad/sesion";
 import { ErrorApi } from "@/lib/api";
 import { formatearFecha, formatearPrecio } from "@/lib/formato";
 
-import { cancelarAction, completarEfectivoAction, despacharAction, entregarAction } from "./acciones";
+import { cancelarAction, completarEfectivoAction, despacharAction, entregarAction, resolverIncidenciaAction } from "./acciones";
 
 export const metadata: Metadata = { title: "Pedido" };
 
@@ -34,7 +35,7 @@ function acciones(p: PedidoAdmin) {
 export default async function PedidoPanel({ params }: PageProps<"/admin/pedidos/[id]">) {
   await requerirPermiso("pedidos.gestionar");
   const { id } = await params;
-  const pedido = await obtenerPedido(id).catch((e: unknown) => {
+  const [pedido, incidencias] = await Promise.all([obtenerPedido(id), listarIncidencias(id)]).catch((e: unknown) => {
     if (e instanceof ErrorApi && (e.status === 400 || e.status === 404)) notFound();
     throw e;
   });
@@ -54,6 +55,8 @@ export default async function PedidoPanel({ params }: PageProps<"/admin/pedidos/
           <span className="text-sm text-muted-foreground">Creado el {formatearFecha(pedido.creadoEn)}</span>
         </div>
       </div>
+
+      <IncidenciasPago items={incidencias} resolver={resolverIncidenciaAction.bind(null, id)} />
 
       {hayAcciones ? (
         <Card>

@@ -91,3 +91,48 @@ func DecidirConfirmacion(p domain.Pedido, montoAcreditadoCentavos int64) Confirm
 	}
 	return Confirmar
 }
+
+// VencimientoDePreferencia dice hasta cuándo se puede pagar la preferencia de
+// Mercado Pago del pedido: el mismo instante en que vence su reserva. Así no
+// se puede pagar un pedido ya cancelado, con su stock liberado. Sin vence_en
+// (efectivo) no hay plazo. Propuesta del Issue #14 (spec, sección 6,
+// «Pendiente crítico de integración»): no se mergea sin la decisión del
+// equipo.
+func VencimientoDePreferencia(p domain.Pedido) (time.Time, bool) {
+	if p.VenceEn == nil {
+		return time.Time{}, false
+	}
+	return *p.VenceEn, true
+}
+
+// AccionAlVencer es lo que el vencimiento automático hace con un pedido cuya
+// reserva se agotó, según lo que Mercado Pago informa de sus pagos.
+type AccionAlVencer int
+
+const (
+	// Cancelar: ningún pago se cobró ni puede cobrarse; se cancela y se
+	// libera el stock.
+	Cancelar AccionAlVencer = iota
+	// Esperar: hay un pago que todavía puede acreditarse; se revisa en la
+	// próxima vuelta.
+	Esperar
+	// ConciliarAprobado: Mercado Pago tiene un pago aprobado cuyo webhook
+	// no llegó; se aplica DecidirConfirmacion, igual que en el webhook.
+	ConciliarAprobado
+)
+
+// DecidirAlVencer decide qué hacer con un pedido vencido a partir de los
+// estados de sus pagos en Mercado Pago. Un pago aprobado manda sobre todo lo
+// demás: el dinero ya se cobró y el pedido no se puede cancelar en silencio.
+// Propuesta del Issue #14.
+func DecidirAlVencer(estados []string) AccionAlVencer {
+	for _, e := range estados {
+		if e == "approved" {
+			return ConciliarAprobado
+		}
+	}
+	if HayPagoActivo(estados) {
+		return Esperar
+	}
+	return Cancelar
+}

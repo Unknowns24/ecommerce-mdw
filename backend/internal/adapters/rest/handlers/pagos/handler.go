@@ -16,6 +16,7 @@ import (
 	"github.com/Unknowns24/ecommerce-mdw/internal/adapters/external/mp"
 	"github.com/Unknowns24/ecommerce-mdw/internal/core/domain"
 	usecases "github.com/Unknowns24/ecommerce-mdw/internal/usecases/inventario"
+	reglas "github.com/Unknowns24/ecommerce-mdw/internal/usecases/pagos"
 )
 
 type handler struct {
@@ -24,6 +25,7 @@ type handler struct {
 	stock         *usecases.ServicioStock
 	mp            *mp.Cliente
 	webhookSecret string
+	incidencias   *reglas.GestionIncidencias
 }
 
 func nuevoHandler(db *gorm.DB, cfg config.Config) *handler {
@@ -33,6 +35,7 @@ func nuevoHandler(db *gorm.DB, cfg config.Config) *handler {
 		stock:         usecases.NuevoServicioStock(db),
 		mp:            mp.NuevoCliente(cfg.MercadoPagoAccessToken, cfg.PublicBaseURL),
 		webhookSecret: cfg.MercadoPagoWebhookSecret,
+		incidencias:   reglas.NuevaGestionIncidencias(repo.NuevoRepositorioIncidencias(db), time.Now),
 	}
 }
 

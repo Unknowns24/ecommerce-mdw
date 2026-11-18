@@ -184,6 +184,13 @@ test.describe("Catálogo", () => {
     await pidePermiso(request, ["GET"], `/api/admin/variantes/${VARIANTE_CON_STOCK}/imagenes`, SIN_CATALOGO);
   });
 
+  test("el administrador puede listar imágenes y una variante inexistente devuelve 404", async ({ request }) => {
+    const respuesta = await llamar(request, "GET", `/api/admin/variantes/${VARIANTE_CON_STOCK}/imagenes`, "dueno");
+    expect(respuesta.status()).toBe(200);
+    expect(Array.isArray(await respuesta.json())).toBe(true);
+    expect((await llamar(request, "GET", `/api/admin/variantes/${INEXISTENTE}/imagenes`, "dueno")).status()).toBe(404);
+  });
+
   test("POST /api/admin/variantes/{id}/imagenes: catalogo.escribir", async ({ request }) => {
     await pidePermiso(request, ["POST"], `/api/admin/variantes/${INEXISTENTE}/imagenes`, SIN_CATALOGO);
   });
@@ -236,6 +243,27 @@ test.describe("Inventario", () => {
 });
 
 test.describe("Carrito y pedidos", () => {
+  test("checkout rechaza una variante cuyo producto o marca se desactivó", async ({ request }) => {
+    async function crear(ruta: string, cuerpo: unknown) {
+      const r = await llamar(request, "POST", ruta, "dueno", cuerpo);
+      expect(r.status(), `crear fixture ${ruta}: ${await r.text()}`).toBe(201);
+      return (await r.json()) as { id: string };
+    }
+    for (const entidad of ["productos", "marcas"]) {
+      const marca = await crear("/api/admin/marcas", { nombre: `Marca ${entidad} e2e` });
+      const producto = await crear("/api/admin/productos", { nombre: `Producto ${entidad} e2e`, marcaId: marca.id, metodologiaRotacion: "FIFO" });
+      const variante = await crear("/api/admin/variantes", { productoId: producto.id, codigo: `INACTIVO-${entidad}`, nombre: "Variante activa", precioMinoristaCentavos: 150000, precioMayoristaCentavos: 100000 });
+      const proveedor = await crear("/api/admin/proveedores", { nombre: `Proveedor ${entidad} e2e` });
+      await crear("/api/admin/lotes", { varianteId: variante.id, proveedorId: proveedor.id, unidades: 2, costoUnitarioCentavos: 50000, fecha: "2026-11-17T12:00:00Z" });
+      const id = entidad === "productos" ? producto.id : marca.id;
+      expect((await llamar(request, "DELETE", `/api/admin/${entidad}/${id}`, "dueno")).status()).toBe(204);
+      const r = await llamar(request, "POST", "/api/pedidos", "anonimo", {
+        items: [{ varianteId: variante.id, unidades: 1 }], comprador: COMPRADOR, modoEntrega: "RETIRO", medioPago: "MERCADO_PAGO",
+      });
+      expect(r.status(), `checkout con ${entidad} desactivado`).toBe(404);
+    }
+  });
+
   test("GET /api/tienda/configuracion es público", async ({ request }) => {
     await esPublico(request, "GET", "/api/tienda/configuracion");
   });
@@ -301,6 +329,20 @@ test.describe("Carrito y pedidos", () => {
 
   test("POST /api/admin/pedidos/{id}/cancelacion: pedidos.gestionar", async ({ request }) => {
     await pidePermiso(request, ["POST"], `/api/admin/pedidos/${INEXISTENTE}/cancelacion`, SIN_PEDIDOS);
+  });
+
+  test("GET /api/admin/pedidos/{id}/incidencias: pedidos.gestionar", async ({ request }) => {
+    await pidePermiso(request, ["GET"], `/api/admin/pedidos/${INEXISTENTE}/incidencias`, SIN_PEDIDOS);
+    expect((await llamar(request, "GET", `/api/admin/pedidos/${INEXISTENTE}/incidencias`, "dueno")).status()).toBe(404);
+  });
+
+  test("POST /api/admin/pedidos/{id}/incidencias/{incidenciaID}/resolucion: pedidos.gestionar", async ({ request }) => {
+    const ruta = `/api/admin/pedidos/${INEXISTENTE}/incidencias/${INEXISTENTE}/resolucion`;
+    await pidePermiso(request, ["POST"], ruta, SIN_PEDIDOS);
+    const invalido = await llamar(request, "POST", ruta, "dueno", { nota: "   " });
+    expect(invalido.status()).toBe(400);
+    expect((await invalido.json()).detalles.campos.nota).toBeTruthy();
+    expect((await llamar(request, "POST", ruta, "dueno", { nota: "Verificado manualmente" })).status()).toBe(404);
   });
 });
 

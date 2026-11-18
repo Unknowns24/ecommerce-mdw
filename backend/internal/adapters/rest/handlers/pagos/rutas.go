@@ -16,4 +16,7 @@ func Montar(r chi.Router, db *gorm.DB, cfg config.Config, mw *middleware.Middlew
 	r.With(mw.SesionOpcional).Post("/api/pedidos/{id}/pago", h.iniciarPago)
 	r.Post("/api/pagos/webhook", h.webhook) // público a propósito: lo llama Mercado Pago, no un usuario
 	r.With(mw.RequiereSesion).Get("/api/pedidos/{id}/pago", h.estadoPago)
+	admin := r.With(mw.RequiereSesion, mw.RequierePermiso("pedidos.gestionar"))
+	admin.Get("/api/admin/pedidos/{id}/incidencias", h.listarIncidencias)
+	admin.Post("/api/admin/pedidos/{id}/incidencias/{incidenciaID}/resolucion", h.resolverIncidencia)
 }
