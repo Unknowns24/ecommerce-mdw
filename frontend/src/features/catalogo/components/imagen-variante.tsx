@@ -23,12 +23,16 @@ export function ImagenVariante({
   className,
   sizes = "(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw",
   principal = false,
+  rotulo,
 }: {
   src?: string;
   alt: string;
   className?: string;
   sizes?: string;
   principal?: boolean;
+  // Texto de la etiqueta cuando no hay foto (la marca): la vitrina se lee
+  // como el rótulo del producto y no como un error.
+  rotulo?: string;
 }) {
   const [fallo, setFallo] = useState(false);
   // Proporción 4:5, la de una foto de frasco (DESIGN.md, «vitrina»).
@@ -38,9 +42,17 @@ export function ImagenVariante({
     return (
       <div
         {...(alt ? { role: "img", "aria-label": `${alt}: sin imagen` } : { "aria-hidden": true })}
-        className={cn(contenedor, "grid place-items-center text-sm text-muted-foreground")}
+        className={cn(contenedor, "grid place-items-center p-[10%] text-center")}
       >
-        Sin imagen
+        {rotulo ? (
+          <span className="grid gap-2 justify-items-center">
+            <span className="text-[clamp(0.8125rem,3.5vw,1.125rem)] leading-tight font-light tracking-[0.2em] text-foreground/80 uppercase">{rotulo}</span>
+            <span className="h-px w-8 bg-foreground/30" />
+            <span className="text-xs text-muted-foreground">Sin foto por ahora</span>
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground">Sin imagen</span>
+        )}
       </div>
     );
   }
@@ -56,7 +68,7 @@ export function ImagenVariante({
         loading={principal ? "eager" : "lazy"}
         fetchPriority={principal ? "high" : "auto"}
         onError={() => setFallo(true)}
-        className="object-contain p-[6%]"
+        className="object-contain p-[6%] transition-transform duration-500 ease-out group-hover:scale-[1.03]"
       />
     </div>
   );

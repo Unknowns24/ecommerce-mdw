@@ -4,8 +4,11 @@ import { Select } from "@/components/ui/select";
 
 import { ORDENES, type FiltrosCatalogo, type MarcaPublica } from "../tipos";
 
+const claseEtiqueta = "text-[0.6875rem] font-normal tracking-[0.14em] text-muted-foreground uppercase";
+
 // Formulario GET: búsqueda, filtros y orden se combinan en la query string y
-// funcionan sin JavaScript. Cambiar un filtro vuelve a la página 1.
+// funcionan sin JavaScript. Cambiar un filtro vuelve a la página 1. Va en una
+// barra sobre la grilla: en el teléfono, dos columnas y el botón a lo ancho.
 export function FiltrosCatalogoForm({
   filtros,
   marcas,
@@ -14,14 +17,16 @@ export function FiltrosCatalogoForm({
   marcas: MarcaPublica[];
 }) {
   return (
-    <form action="/" className="grid grid-cols-2 gap-3 lg:grid-cols-1" aria-label="Filtrar el catálogo">
+    <form action="/" className="grid grid-cols-2 gap-3 sm:flex sm:items-end" aria-label="Filtrar el catálogo">
       {/* La búsqueda se escribe en el encabezado; acá solo se conserva al
           cambiar filtros u orden. */}
       {filtros.q ? <input type="hidden" name="q" value={filtros.q} /> : null}
       {/* La categoría se elige con los accesos sobre la grilla; acá se conserva. */}
       {filtros.categoria ? <input type="hidden" name="categoria" value={filtros.categoria} /> : null}
-      <div className="col-span-2 grid gap-1.5 lg:col-span-1">
-        <Label htmlFor="filtro-marca">Marca</Label>
+      <div className="grid gap-1.5 sm:w-44">
+        <Label htmlFor="filtro-marca" className={claseEtiqueta}>
+          Marca
+        </Label>
         <Select id="filtro-marca" name="marca" defaultValue={filtros.marca}>
           <option value="">Todas</option>
           {marcas.map((m) => (
@@ -31,8 +36,10 @@ export function FiltrosCatalogoForm({
           ))}
         </Select>
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="filtro-orden">Ordenar por</Label>
+      <div className="grid gap-1.5 sm:w-52">
+        <Label htmlFor="filtro-orden" className={claseEtiqueta}>
+          Ordenar por
+        </Label>
         <Select id="filtro-orden" name="orden" defaultValue={filtros.orden}>
           {Object.entries(ORDENES).map(([valor, texto]) => (
             <option key={valor} value={valor}>
@@ -41,11 +48,9 @@ export function FiltrosCatalogoForm({
           ))}
         </Select>
       </div>
-      <div className="flex flex-col justify-end gap-2">
-        <Button type="submit" className="w-full">
-          Aplicar
-        </Button>
-      </div>
+      <Button type="submit" className="col-span-2 w-full text-xs tracking-[0.14em] uppercase sm:w-auto">
+        Aplicar
+      </Button>
     </form>
   );
 }

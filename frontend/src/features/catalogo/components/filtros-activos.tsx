@@ -29,7 +29,7 @@ export function FiltrosActivos({
           <Link
             href={a.href}
             aria-label={`Quitar ${a.quitar}`}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-secondary px-3 text-sm text-secondary-foreground hover:bg-secondary/70"
+            className="inline-flex h-9 items-center gap-1.5 bg-secondary px-3 text-xs tracking-[0.1em] text-secondary-foreground uppercase hover:bg-secondary/70"
           >
             {a.texto}
             <XIcon className="size-3.5" aria-hidden="true" />
@@ -37,7 +37,7 @@ export function FiltrosActivos({
         </li>
       ))}
       <li>
-        <Link href="/" className="inline-flex h-9 items-center px-1 text-sm underline underline-offset-4">
+        <Link href="/" className="inline-flex h-9 items-center px-1 text-xs tracking-[0.1em] uppercase underline underline-offset-4">
           Quitar todo
         </Link>
       </li>

@@ -5,11 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* Fuentes (DESIGN.md, sección 4): Public Sans para la interfaz y Bodoni
-     Moda solo para nombres de producto y títulos de la tienda. Las variables
-     las define next/font en app/layout.tsx. */
-  --font-sans: var(--font-public-sans), system-ui, sans-serif;
-  --font-heading: var(--font-bodoni), Georgia, serif;
+  /* Fuente (DESIGN.md, sección 4): Jost para todo. La variable la define
+     next/font en app/layout.tsx. */
+  --font-sans: var(--font-jost), system-ui, sans-serif;
+  --font-heading: var(--font-jost), system-ui, sans-serif;
   --color-precio: var(--precio);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -52,43 +51,42 @@
 }
 
 :root {
-  /* «El mostrador del local» (DESIGN.md). Contrastes medidos (WCAG 2.1):
-     tinta sobre papel 11,5:1 · grafito 13,4:1 · niebla 5,8:1 (5,2:1 sobre
-     nácar) · frasco 9,1:1 · alerta 8,0:1. Los bordes de los controles usan
-     niebla (3:1 o más); «borde» es solo para separadores. */
+  /* «Blanco y negro» (DESIGN.md). Contrastes medidos (WCAG 2.1): tinta sobre
+     papel 18,9:1 · gris 6,7:1 (6,1:1 sobre humo) · borde de control 4,5:1 ·
+     alerta 8,0:1. «borde» es solo para separadores. */
   --background: #ffffff;          /* papel */
-  --foreground: #2b2f36;          /* grafito */
+  --foreground: #111111;          /* tinta */
   --card: #ffffff;
-  --card-foreground: #2b2f36;
+  --card-foreground: #111111;
   --popover: #ffffff;
-  --popover-foreground: #2b2f36;
-  --primary: #1e3a5f;             /* tinta: la marca (se conserva) */
+  --popover-foreground: #111111;
+  --primary: #111111;             /* tinta: botón principal y barra superior */
   --primary-foreground: #ffffff;
-  --secondary: #f5f1f4;           /* nácar */
-  --secondary-foreground: #1e3a5f;
-  --muted: #f5f1f4;               /* nácar: vitrina y encabezado */
-  --muted-foreground: #5f6670;    /* niebla */
-  --accent: #f5f1f4;
-  --accent-foreground: #1e3a5f;
-  --destructive: #9f1239;         /* alerta */
-  --border: #d9d4da;              /* borde: solo separadores */
-  --input: #5f6670;               /* borde de los controles: niebla */
-  --ring: #7a2e4a;                /* frasco: el foco del teclado */
-  --precio: #7a2e4a;              /* frasco: el precio */
-  --chart-1: #1e3a5f;
-  --chart-2: #7a2e4a;
-  --chart-3: #5f6670;
-  --chart-4: #d9d4da;
-  --chart-5: #2b2f36;
-  --radius: 0.375rem;
-  --sidebar: #f5f1f4;
-  --sidebar-foreground: #2b2f36;
-  --sidebar-primary: #1e3a5f;
+  --secondary: #f4f4f4;           /* humo */
+  --secondary-foreground: #111111;
+  --muted: #f4f4f4;               /* humo: vitrina de la foto y banners */
+  --muted-foreground: #5c5c5c;    /* gris: texto secundario */
+  --accent: #f4f4f4;
+  --accent-foreground: #111111;
+  --destructive: #9f1239;         /* alerta: errores y 409 */
+  --border: #e6e6e6;              /* borde: solo separadores */
+  --input: #767676;               /* borde de los controles (3:1 o más) */
+  --ring: #111111;                /* foco del teclado */
+  --precio: #111111;
+  --chart-1: #111111;
+  --chart-2: #5c5c5c;
+  --chart-3: #9a9a9a;
+  --chart-4: #d4d4d4;
+  --chart-5: #2b2b2b;
+  --radius: 0rem;                 /* esquinas rectas */
+  --sidebar: #f4f4f4;
+  --sidebar-foreground: #111111;
+  --sidebar-primary: #111111;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5f1f4;
-  --sidebar-accent-foreground: #1e3a5f;
-  --sidebar-border: #d9d4da;
-  --sidebar-ring: #7a2e4a;
+  --sidebar-accent: #f4f4f4;
+  --sidebar-accent-foreground: #111111;
+  --sidebar-border: #e6e6e6;
+  --sidebar-ring: #111111;
 }
 
 .dark {

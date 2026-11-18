@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { BarraPromocion } from "@/components/barra-promocion";
 import { EncabezadoTienda } from "@/components/encabezado-tienda";
 import { PieTienda } from "@/components/pie-tienda";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,6 +14,7 @@ export default async function LayoutCuenta({ children }: { children: ReactNode }
   await requerirSesion();
   return (
     <>
+      <BarraPromocion />
       <EncabezadoTienda />
       <div className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-6">
         <nav aria-label="Tu cuenta" className="flex flex-wrap gap-1 border-b pb-2">

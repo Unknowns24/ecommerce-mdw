@@ -9,12 +9,12 @@ import { ImagenVariante } from "./imagen-variante";
 // Galería de la ficha: la foto principal y, si hay más, miniaturas que la
 // cambian (botones con aria-pressed, operables con teclado). Sin zoom ni
 // carrusel: las fotos del catálogo son de producto, no de campaña.
-export function GaleriaVariante({ imagenes, nombre }: { imagenes: string[]; nombre: string }) {
+export function GaleriaVariante({ imagenes, nombre, rotulo }: { imagenes: string[]; nombre: string; rotulo?: string }) {
   const [actual, setActual] = useState(0);
   const principal = imagenes[actual];
   return (
     <div className="grid gap-3">
-      <ImagenVariante src={principal} alt={nombre} principal sizes="(min-width: 768px) 50vw, 100vw" />
+      <ImagenVariante src={principal} alt={nombre} rotulo={rotulo} principal sizes="(min-width: 768px) 55vw, 100vw" />
       {imagenes.length > 1 ? (
         <ul className="grid grid-cols-5 gap-2" aria-label="Fotos del producto">
           {imagenes.map((src, i) => (

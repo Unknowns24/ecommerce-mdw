@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
+import { notFound, unstable_rethrow } from "next/navigation";
+import { Suspense, type ReactNode } from "react";
 
 import { BarraAccionFija } from "@/components/barra-accion-fija";
 import { BotonAgregarAlCarrito } from "@/features/carrito/components/boton-agregar";
-import { obtenerCondicionesEntrega, obtenerVariante, type CondicionesEntrega } from "@/features/catalogo/api";
+import { listarVariantes, obtenerCondicionesEntrega, obtenerVariante, type CondicionesEntrega } from "@/features/catalogo/api";
 import { SinStock } from "@/features/catalogo/components/estado-stock";
 import { GaleriaVariante } from "@/features/catalogo/components/galeria-variante";
 import { Migas } from "@/features/catalogo/components/migas";
+import { TarjetaVariante } from "@/features/catalogo/components/tarjeta-variante";
 import { ErrorApi } from "@/lib/api";
 import { formatearPrecio } from "@/lib/formato";
 
@@ -51,6 +52,37 @@ function EntregaYPago({ condiciones }: { condiciones: CondicionesEntrega }) {
   );
 }
 
+// Más productos de la misma categoría (sin la variante que se está viendo).
+// Llega después de la ficha (Suspense): no la demora.
+async function Relacionados({ categoria, excluir }: { categoria: { id: string; nombre: string }; excluir: string[] }) {
+  const pagina = await listarVariantes({ q: "", categoria: categoria.id, marca: "", orden: "nombre_asc", pagina: 1 }).catch((e: unknown) => {
+    unstable_rethrow(e);
+    console.error("productos relacionados", e);
+    return null;
+  });
+  const items = (pagina?.items ?? []).filter((v) => !excluir.includes(v.id)).slice(0, 4);
+  if (items.length === 0) return null;
+  return (
+    <section aria-labelledby="titulo-relacionados" className="grid gap-5 pt-16">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 id="titulo-relacionados" className="font-heading text-[1.75rem] leading-tight font-medium sm:text-4xl">
+          Más de {categoria.nombre}
+        </h2>
+        <Link href={`/?categoria=${categoria.id}`} className="text-sm font-medium underline underline-offset-4">
+          Ver todo
+        </Link>
+      </div>
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-4 sm:gap-x-5">
+        {items.map((v) => (
+          <li key={v.id}>
+            <TarjetaVariante variante={v} titulo="h3" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 // Ficha de una variante (H05). Inactiva, inexistente o con un id mal
 // formado: el 404 de la tienda.
 export default async function DetalleVariante({ params }: PageProps<"/variantes/[id]">) {
@@ -78,13 +110,13 @@ export default async function DetalleVariante({ params }: PageProps<"/variantes/
         ]}
       />
 
-      <article className="grid gap-6 md:grid-cols-2 md:gap-10">
-        <GaleriaVariante imagenes={imagenes} nombre={variante.nombre} />
+      <article className="grid gap-6 md:grid-cols-[1.15fr_1fr] md:gap-10 lg:gap-16">
+        <GaleriaVariante imagenes={imagenes} nombre={variante.nombre} rotulo={variante.marca} />
 
-        <div className="grid content-start gap-5">
+        <div className="grid content-start gap-6 md:sticky md:top-36 md:self-start">
           <div className="grid gap-1">
             <p className="text-sm text-muted-foreground">{variante.marca}</p>
-            <h1 className="font-heading text-[2rem] leading-[1.1] font-semibold text-balance md:text-[2.5rem]">{variante.nombre}</h1>
+            <h1 className="font-heading text-[2rem] leading-[1.08] font-medium text-balance md:text-[2.75rem]">{variante.nombre}</h1>
             <p className="text-[0.8125rem] text-muted-foreground">Código {variante.codigo}</p>
           </div>
 
@@ -142,6 +174,12 @@ export default async function DetalleVariante({ params }: PageProps<"/variantes/
           </div>
         </div>
       </article>
+
+      {categoria ? (
+        <Suspense fallback={null}>
+          <Relacionados categoria={categoria} excluir={[variante.id, ...variante.otrasVariantes.map((o) => o.id)]} />
+        </Suspense>
+      ) : null}
     </div>
   );
 }
